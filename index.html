@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>School Flow — What happened?</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <div class="brand">School <span>Flow</span></div>
+      <nav>
+        <button class="active" data-view="today">Today</button>
+        <button data-view="people">People</button>
+        <button data-view="history">History</button>
+      </nav>
+      <div class="aside-note">One action.<br>Useful consequences.</div>
+    </aside>
+
+    <main>
+      <section id="today" class="view active">
+        <div class="top">
+          <div>
+            <div class="eyebrow">School operations</div>
+            <h1>What happened?</h1>
+            <div class="sub">Tell School Flow what happened in normal language. It turns one small update into the records and follow-up information the school needs.</div>
+          </div>
+          <div class="date" id="todayDate"></div>
+        </div>
+
+        <div class="record">
+          <div class="record-head">
+            <div>
+              <div class="record-title">Record something that happened</div>
+              <div class="record-help">No forms. No duplicate entry.</div>
+            </div>
+          </div>
+
+          <textarea id="input" placeholder="e.g. 2 learners were absent in PP2 today"></textarea>
+          <div class="composer">
+            <button class="primary" id="understandBtn">Understand</button>
+            <button class="secondary" id="clearBtn">Clear</button>
+          </div>
+
+          <div class="examples">
+            <button class="example">2 learners were absent in PP2 today</button>
+            <button class="example">PP2 completed today's counting assignment</button>
+            <button class="example">Brian didn't complete today's work</button>
+            <button class="example">Mary was sent to the office</button>
+          </div>
+
+          <div class="preview" id="preview">
+            <div class="understood">The system understood this as: <strong id="understoodText"></strong></div>
+            <div class="consequence" id="consequence"></div>
+            <button class="primary confirm" id="confirmBtn">Save this event</button>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="panel">
+            <h2>Today, automatically</h2>
+            <div class="stats">
+              <div class="stat"><div class="n" id="learnersStat">0</div><div class="l">Learners</div></div>
+              <div class="stat"><div class="n" id="presentStat">0</div><div class="l">Present</div></div>
+              <div class="stat"><div class="n" id="outstandingStat">0</div><div class="l">Work outstanding</div></div>
+              <div class="stat"><div class="n" id="incidentStat">0</div><div class="l">Incidents</div></div>
+            </div>
+          </div>
+          <div class="panel">
+            <h2>Recent activity</h2>
+            <div id="recent"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="people" class="view">
+        <div class="page-head">
+          <div><div class="eyebrow">People</div><h1>People</h1></div>
+        </div>
+        <div class="panel"><div id="peopleList" class="people"></div></div>
+      </section>
+
+      <section id="history" class="view">
+        <div class="page-head">
+          <div><div class="eyebrow">History</div><h1>Everything recorded</h1></div>
+          <input class="search" id="search" placeholder="Search history">
+        </div>
+        <div class="panel"><div id="historyList"></div></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
