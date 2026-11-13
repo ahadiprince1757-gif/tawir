@@ -177,7 +177,7 @@ function MobileHeaderNav({ onNavigate, backendConnected, activeClassScope, onSel
           onChange={(e) => onSelectClassScope(e.target.value)}
           title="Switch view between your assigned class and all classes"
         >
-          <option value="ALL">🏫 All School</option>
+          <option value="ALL">All School</option>
           {availableClasses.map(cls => (
             <option key={cls} value={cls}>
               {cls}
