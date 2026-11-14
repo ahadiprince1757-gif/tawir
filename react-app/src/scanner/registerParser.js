@@ -9,6 +9,7 @@
  * - Extracts guardian contact if present (phone numbers)
  * - Strips attendance check-marks (P/A, 1/0, tick-marks, day numbers 1..31)
  * - Filters out document headers, totals, signatures, and noise
+ * - STRICT ANTI-HALLUCINATION: Rejects random character noise, smudges, and non-name patterns
  */
 
 export function parseRegisterText(rawText = '', defaultClass = '') {
@@ -66,21 +67,21 @@ function isSystemHeaderLine(line) {
     'academic year', 'teacher:', 'date:', 'ministry of education', 'page ',
     's/no', 'serial no', 'adm no', 'admission number', 'student name', 'learner name',
     'present', 'absent', 'total present', 'total absent', 'grand total', 'boys:', 'girls:',
-    'signature', 'remarks', 'headteacher', 'class teacher', 'percentage', 'termly'
+    'signature', 'remarks', 'headteacher', 'class teacher', 'percentage', 'termly',
+    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+    'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'
   ];
 
   if (administrativeTerms.some(term => lower.includes(term))) {
-    // Exception: If line has a student name accompanied by words, check if it's purely a header
     if (lower.startsWith('teacher:') || lower.startsWith('date:') || lower.includes('attendance register')) {
       return true;
     }
-    // Check if line consists mostly of header keywords
     const headerWordCount = administrativeTerms.filter(t => lower.includes(t)).length;
     if (headerWordCount >= 2) return true;
   }
 
   // Lines that are only numbers or punctuation (like a line of totals "18 20 22 90%")
-  if (/^[\d\s|.,+/%()\-#]+$/.test(line)) {
+  if (/^[\d\s|.,+/%()\-#=_~]+$/.test(line)) {
     return true;
   }
 
@@ -109,9 +110,9 @@ export function parseStudentLine(line, fallbackClass) {
     admissionNumber = prefixedAdmMatch[0].replace(/^(?:adm(?:ission)?(?:\s*no\.?)?[\/:\s-]*|\#)/i, '').trim();
     text = text.replace(prefixedAdmMatch[0], ' ');
   } else {
-    // Or standalone 3-6 digit number near beginning or end of line
+    // Standalone 3-6 digit number near beginning or end of line
     const standaloneNumMatch = text.match(/(?:^|[\s,])(\d{3,6})(?:[\s,]|$)/);
-    if (standaloneNumMatch && !/^(?:202[0-9]|19\d{2})$/.test(standaloneNumMatch[1])) { // avoid years like 2026
+    if (standaloneNumMatch && !/^(?:202[0-9]|19\d{2})$/.test(standaloneNumMatch[1])) {
       admissionNumber = standaloneNumMatch[1];
       text = text.replace(standaloneNumMatch[0], ' ');
     }
@@ -140,9 +141,9 @@ export function parseStudentLine(line, fallbackClass) {
   // 6. Strip attendance tick marks at the end of the line:
   // e.g. "P P A P P", "1 0 1 1", "P. P. A.", "18/20", "95%"
   text = text.replace(/(?:\s+(?:[PAX\u2713\u2714\u2717\u2718]|[01]|present|absent)\.?)+\s*$/i, '');
-  text = text.replace(/\s+\d{1,2}\/\d{1,2}\s*$/, ''); // 19/20
-  text = text.replace(/\s+\d{1,3}%\s*$/, ''); // 95%
-  text = text.replace(/\s+\d{1,2}\s*$/, ''); // trailing total days
+  text = text.replace(/\s+\d{1,2}\/\d{1,2}\s*$/, '');
+  text = text.replace(/\s+\d{1,3}%\s*$/, '');
+  text = text.replace(/\s+\d{1,2}\s*$/, '');
 
   // 7. Strip stray parenthesis, brackets, and symbols
   text = text.replace(/[\(\)\[\]\{\}_*~^`]/g, ' ').trim();
@@ -163,16 +164,17 @@ export function parseStudentLine(line, fallbackClass) {
 
   if (nameWords.length === 0) return null;
 
-  // Filter out any lingering keywords that aren't names
+  // Filter out any administrative keywords that aren't names
   const nonNameKeywords = new Set([
     'total', 'present', 'absent', 'average', 'remarks', 'pass', 'fail',
-    'score', 'grade', 'class', 'stream', 'gender', 'contact', 'name', 'date'
+    'score', 'grade', 'class', 'stream', 'gender', 'contact', 'name', 'date',
+    'serial', 'number', 'term', 'week', 'day', 'sign', 'signature', 'year', 'month'
   ]);
 
   const cleanWords = nameWords.filter(w => !nonNameKeywords.has(w.toLowerCase()));
   if (cleanWords.length === 0) return null;
 
-  // Title-case formatting (handles "O'Connor", "Mwangi", "Alvarez")
+  // Title-case formatting and gibberish rejection
   const validWords = cleanWords.filter(w => !isGibberishWord(w));
   if (validWords.length === 0) return null;
 
@@ -206,18 +208,23 @@ export function isGibberishWord(word = '') {
   const w = word.trim().toLowerCase();
   if (w.length <= 1) return true;
 
-  // Real human name words must contain at least one vowel
-  if (w.length >= 3 && !/[aeiouy]/.test(w)) {
+  // Real human name words must contain at least one vowel (a, e, i, o, u, y)
+  if (w.length >= 2 && !/[aeiouy]/.test(w)) {
     return true;
   }
 
-  // Reject unnatural consonant clusters (e.g. "xkpth", "qzrbm")
+  // Reject unnatural consonant clusters (e.g. "xkpth", "qzrbm", "strng" if > 4 non-vowels)
   if (/[bcdfghjklmnpqrstvwxz]{5,}/.test(w)) {
     return true;
   }
 
   // Reject triple repeated characters (e.g. "xxx", "lll")
   if (/([a-z])\1{2,}/.test(w)) {
+    return true;
+  }
+
+  // Reject words with impossible letter combinations
+  if (/(?:qx|qz|jx|qj|wq|zx|xx|jj)/.test(w)) {
     return true;
   }
 
@@ -229,6 +236,6 @@ export function isGibberishName(name = '') {
   if (parts.length === 0) return true;
 
   const gibberishCount = parts.filter(isGibberishWord).length;
-  // If more than half the words are gibberish, the line is hallucinated noise
-  return gibberishCount / parts.length > 0.4;
+  // If more than 35% of the words are gibberish, the whole line is noise
+  return gibberishCount / parts.length > 0.35;
 }
