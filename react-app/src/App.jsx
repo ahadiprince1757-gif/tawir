@@ -907,11 +907,13 @@ function TodayView({ schoolMemory, learners, events, onCommitEvent, onToggleAtte
 /*  LEARNERS DIRECTORY VIEW WITH COMPREHENSIVE SEARCH & FILTER CHIPS      */
 /* ══════════════════════════════════════════════════════════════════════════ */
 
-function LearnersView({ learners, schoolMemory, onSelectLearner }) {
+function LearnersView({ learners, schoolMemory, onSelectLearner, onDeleteLearners, onClearColumn, onToast }) {
   const [query, setQuery] = useState('');
   const [selectedClass, setSelectedClass] = useState('ALL');
   const [sortField, setSortField] = useState('admissionNumber'); // 'admissionNumber' | 'fullName' | 'className' | 'gender' | 'attendance' | 'guardianName'
   const [sortDirection, setSortDirection] = useState('asc'); // 'asc' | 'desc'
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [selectedCol, setSelectedCol] = useState(''); // '' | 'section' | 'guardianName' | 'contact' | 'attendance'
 
   // Unique classes for filter chips & dropdown
   const classesList = useMemo(() => {
@@ -967,6 +969,45 @@ function LearnersView({ learners, schoolMemory, onSelectLearner }) {
     });
   }, [learners, query, selectedClass, sortField, sortDirection, schoolMemory]);
 
+  const toggleSelectRow = (id, e) => {
+    if (e) e.stopPropagation();
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === filtered.length && filtered.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(l => l.id)));
+    }
+  };
+
+  const handleEraseSelectedRows = () => {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    onDeleteLearners && onDeleteLearners(ids);
+    setSelectedIds(new Set());
+  };
+
+  const handleEraseSelectedColumn = () => {
+    if (!selectedCol) return;
+    onClearColumn && onClearColumn(selectedCol, filtered.map(l => l.id));
+    setSelectedCol('');
+  };
+
+  const colNames = {
+    section: 'Sec (Section)',
+    guardianName: 'Guardian Name',
+    contact: 'Contact (Phone & Email)',
+    gender: 'Gender',
+    attendance: 'Attendance (Reset to 100% Present)'
+  };
+
   return (
     <section className="view active">
       <div className="page-head">
@@ -974,7 +1015,7 @@ function LearnersView({ learners, schoolMemory, onSelectLearner }) {
           <div className="eyebrow">Operating Memory</div>
           <h1>Learners Directory</h1>
           <div className="sub">
-            Click any column header to sort. Search by full/partial admission number, any part of a name, or class.
+            Click row to view dossier. Select rows or a column below, then tap Erase to remove instantly.
           </div>
         </div>
 
@@ -1008,34 +1049,116 @@ function LearnersView({ learners, schoolMemory, onSelectLearner }) {
         </div>
       </div>
 
-      {/* Class Filter Chips */}
-      <div className="class-filter-chips">
-        <button
-          className={`filter-chip ${selectedClass === 'ALL' ? 'active' : ''}`}
-          onClick={() => setSelectedClass('ALL')}
-        >
-          All Classes ({learners.length})
-        </button>
-        {classesList.map(cls => {
-          const count = learners.filter(l => l.className === cls).length;
-          return (
-            <button
-              key={cls}
-              className={`filter-chip ${selectedClass === cls ? 'active' : ''}`}
-              onClick={() => setSelectedClass(cls)}
-            >
-              {cls} ({count})
-            </button>
-          );
-        })}
+      {/* Class Filter Chips & Column Selection */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
+        <div className="class-filter-chips" style={{ margin: 0 }}>
+          <button
+            className={`filter-chip ${selectedClass === 'ALL' ? 'active' : ''}`}
+            onClick={() => setSelectedClass('ALL')}
+          >
+            All Classes ({learners.length})
+          </button>
+          {classesList.map(cls => {
+            const count = learners.filter(l => l.className === cls).length;
+            return (
+              <button
+                key={cls}
+                className={`filter-chip ${selectedClass === cls ? 'active' : ''}`}
+                onClick={() => setSelectedClass(cls)}
+              >
+                {cls} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Spreadsheet Column Selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>Select Column:</label>
+          <select 
+            className="col-select-dropdown"
+            value={selectedCol}
+            onChange={(e) => {
+              setSelectedCol(e.target.value);
+              setSelectedIds(new Set()); // clear row selection when selecting column
+            }}
+          >
+            <option value="">— None —</option>
+            <option value="section">Sec (Section)</option>
+            <option value="guardianName">Guardian</option>
+            <option value="contact">Contact</option>
+            <option value="gender">Gender</option>
+            <option value="attendance">Attendance (Reset to 100%)</option>
+          </select>
+        </div>
       </div>
+
+      {/* Spreadsheet Row Selection & Erase Toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="sheet-selection-bar">
+          <div className="sheet-selection-count">
+            <span className="selection-badge">{selectedIds.size}</span>
+            <span>{selectedIds.size === 1 ? 'row selected' : 'rows selected'}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button 
+              className="sheet-erase-action-btn"
+              onClick={handleEraseSelectedRows}
+              title="Tap to erase selected rows immediately"
+            >
+              <TrashIcon size={14} />
+              <span>Erase Selected ({selectedIds.size})</span>
+            </button>
+            <button 
+              className="sheet-deselect-btn"
+              onClick={() => setSelectedIds(new Set())}
+            >
+              Deselect All
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Spreadsheet Column Selection & Erase Toolbar */}
+      {selectedCol && selectedIds.size === 0 && (
+        <div className="sheet-selection-bar sheet-col-bar">
+          <div className="sheet-selection-count">
+            <span className="selection-badge" style={{ background: '#795d28' }}>Column</span>
+            <span><strong>{colNames[selectedCol] || selectedCol}</strong> column selected</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button 
+              className="sheet-erase-action-btn"
+              onClick={handleEraseSelectedColumn}
+              title="Tap to erase this column's values across visible learners"
+            >
+              <TrashIcon size={14} />
+              <span>Erase Column Data</span>
+            </button>
+            <button 
+              className="sheet-deselect-btn"
+              onClick={() => setSelectedCol('')}
+            >
+              Deselect
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="panel" style={{ marginTop: 14, padding: 0, overflow: 'hidden' }}>
         <div className="table-responsive">
           <table className="sheet-table">
             <thead>
               <tr>
-                <th style={{ width: '40px', textAlign: 'center' }}>#</th>
+                <th style={{ width: '48px', textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    className="sheet-checkbox"
+                    checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                    onChange={handleSelectAll}
+                    title="Select all rows"
+                  />
+                </th>
                 <th className="sortable-th" onClick={() => handleSort('admissionNumber')}>
                   Admission No {sortField === 'admissionNumber' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
                 </th>
@@ -1045,17 +1168,22 @@ function LearnersView({ learners, schoolMemory, onSelectLearner }) {
                 <th className="sortable-th" onClick={() => handleSort('className')}>
                   Class {sortField === 'className' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
                 </th>
-                <th>Sec</th>
-                <th className="sortable-th" onClick={() => handleSort('gender')}>
+                <th className={selectedCol === 'section' ? 'col-header-selected' : ''}>
+                  Sec
+                </th>
+                <th className={`sortable-th ${selectedCol === 'gender' ? 'col-header-selected' : ''}`} onClick={() => handleSort('gender')}>
                   Gender {sortField === 'gender' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
                 </th>
-                <th className="sortable-th" onClick={() => handleSort('attendance')}>
+                <th className={`sortable-th ${selectedCol === 'attendance' ? 'col-header-selected' : ''}`} onClick={() => handleSort('attendance')}>
                   Attendance {sortField === 'attendance' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
                 </th>
-                <th className="sortable-th" onClick={() => handleSort('guardianName')}>
+                <th className={`sortable-th ${selectedCol === 'guardianName' ? 'col-header-selected' : ''}`} onClick={() => handleSort('guardianName')}>
                   Guardian {sortField === 'guardianName' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
                 </th>
-                <th>Contact</th>
+                <th className={selectedCol === 'contact' ? 'col-header-selected' : ''}>
+                  Contact
+                </th>
+                <th style={{ width: '44px', textAlign: 'center' }}>Erase</th>
               </tr>
             </thead>
             <tbody>
@@ -1065,16 +1193,31 @@ function LearnersView({ learners, schoolMemory, onSelectLearner }) {
                   const att = mem?.attendance;
                   const pct = att && att.totalSchoolDays > 0 ? att.percentage : 100;
                   const isGood = pct >= 85;
+                  const isRowSelected = selectedIds.has(learner.id);
 
                   return (
                     <tr
                       key={learner.id}
-                      className="sheet-row"
-                      onClick={() => onSelectLearner(learner.id)}
-                      title="Click to view full dossier"
+                      className={`sheet-row ${isRowSelected ? 'sheet-row-selected' : ''}`}
+                      onClick={() => {
+                        if (selectedIds.size > 0) {
+                          toggleSelectRow(learner.id);
+                        } else {
+                          onSelectLearner(learner.id);
+                        }
+                      }}
+                      title={selectedIds.size > 0 ? "Click to toggle selection" : "Click to view full dossier"}
                     >
-                      <td style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 11 }}>
-                        {index + 1}
+                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                          <input
+                            type="checkbox"
+                            className="sheet-checkbox"
+                            checked={isRowSelected}
+                            onChange={(e) => toggleSelectRow(learner.id, e)}
+                          />
+                          <span style={{ color: 'var(--muted)', fontSize: 10 }}>{index + 1}</span>
+                        </div>
                       </td>
                       <td>
                         <span className="sheet-adm">
@@ -1087,13 +1230,13 @@ function LearnersView({ learners, schoolMemory, onSelectLearner }) {
                       <td>
                         <span className="sheet-badge">{learner.className}</span>
                       </td>
-                      <td>
+                      <td className={selectedCol === 'section' ? 'sheet-cell-col-selected' : ''}>
                         <span className="sheet-sec">{learner.section || '—'}</span>
                       </td>
-                      <td style={{ color: 'var(--muted)' }}>
+                      <td style={{ color: 'var(--muted)' }} className={selectedCol === 'gender' ? 'sheet-cell-col-selected' : ''}>
                         {learner.gender || '—'}
                       </td>
-                      <td>
+                      <td className={selectedCol === 'attendance' ? 'sheet-cell-col-selected' : ''}>
                         <div className="sheet-att-cell">
                           <span className={`sheet-att-pill ${isGood ? 'att-good' : 'att-warn'}`}>
                             {pct}%
@@ -1103,20 +1246,29 @@ function LearnersView({ learners, schoolMemory, onSelectLearner }) {
                           </small>
                         </div>
                       </td>
-                      <td>
+                      <td className={selectedCol === 'guardianName' ? 'sheet-cell-col-selected' : ''}>
                         <span className="sheet-guardian">
                           {learner.guardianName || '—'}
                         </span>
                       </td>
-                      <td style={{ fontSize: 12, color: 'var(--muted)' }}>
+                      <td style={{ fontSize: 12, color: 'var(--muted)' }} className={selectedCol === 'contact' ? 'sheet-cell-col-selected' : ''}>
                         {learner.guardianPhone || learner.email || '—'}
+                      </td>
+                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          className="row-delete-btn"
+                          title="Erase this row immediately"
+                          onClick={() => onDeleteLearners && onDeleteLearners([learner.id])}
+                        >
+                          <TrashIcon size={13} />
+                        </button>
                       </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan="9" className="empty">
+                  <td colSpan="10" className="empty">
                     No learners matching "<strong>{query}</strong>"{selectedClass !== 'ALL' ? ` in ${selectedClass}` : ''}.
                   </td>
                 </tr>
@@ -1133,10 +1285,11 @@ function LearnersView({ learners, schoolMemory, onSelectLearner }) {
 /*  EVENT TIMELINE VIEW                                                    */
 /* ══════════════════════════════════════════════════════════════════════════ */
 
-function EventTimelineView({ events, learners, onSelectLearner, onDeleteEvent, onClearAllEvents }) {
+function EventTimelineView({ events, learners, onSelectLearner, onDeleteEvent, onDeleteEventsBatch, onClearAllEvents }) {
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState('createdAt'); // 'createdAt' | 'type' | 'learner' | 'class'
   const [sortDirection, setSortDirection] = useState('desc'); // 'desc' | 'asc'
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const learnerMap = useMemo(() => {
     const m = new Map();
@@ -1197,6 +1350,35 @@ function EventTimelineView({ events, learners, onSelectLearner, onDeleteEvent, o
     });
   }, [events, search, learnerMap, sortField, sortDirection]);
 
+  const toggleSelectRow = (id, e) => {
+    if (e) e.stopPropagation();
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === filtered.length && filtered.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(e => e.id)));
+    }
+  };
+
+  const handleEraseSelectedRows = () => {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    if (onDeleteEventsBatch) {
+      onDeleteEventsBatch(ids);
+    } else if (onDeleteEvent) {
+      ids.forEach(id => onDeleteEvent(id));
+    }
+    setSelectedIds(new Set());
+  };
+
   return (
     <section className="view active">
       <div className="page-head">
@@ -1204,7 +1386,7 @@ function EventTimelineView({ events, learners, onSelectLearner, onDeleteEvent, o
           <div className="eyebrow">Operating Memory Log</div>
           <h1>School Memory Event Stream</h1>
           <div className="sub">
-            Complete audit trail of all recorded actions, attendance events, and academic updates. Click column headers to sort.
+            Click row to view learner. Select rows below, then tap Erase to remove instantly.
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1217,11 +1399,7 @@ function EventTimelineView({ events, learners, onSelectLearner, onDeleteEvent, o
           {events.length > 0 && (
             <button
               className="btn-erase-all"
-              onClick={() => {
-                if (window.confirm(`Are you sure you want to erase all ${events.length} events in one click?`)) {
-                  onClearAllEvents && onClearAllEvents();
-                }
-              }}
+              onClick={() => onClearAllEvents && onClearAllEvents()}
               title="Erase all events in one click"
             >
               <TrashIcon size={13} />
@@ -1231,12 +1409,46 @@ function EventTimelineView({ events, learners, onSelectLearner, onDeleteEvent, o
         </div>
       </div>
 
-      <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
+      {/* Spreadsheet Row Selection & Erase Toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="sheet-selection-bar">
+          <div className="sheet-selection-count">
+            <span className="selection-badge">{selectedIds.size}</span>
+            <span>{selectedIds.size === 1 ? 'event selected' : 'events selected'}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button 
+              className="sheet-erase-action-btn"
+              onClick={handleEraseSelectedRows}
+              title="Tap to erase selected events immediately"
+            >
+              <TrashIcon size={14} />
+              <span>Erase Selected ({selectedIds.size})</span>
+            </button>
+            <button 
+              className="sheet-deselect-btn"
+              onClick={() => setSelectedIds(new Set())}
+            >
+              Deselect All
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="panel" style={{ marginTop: 14, padding: 0, overflow: 'hidden' }}>
         <div className="table-responsive">
           <table className="sheet-table">
             <thead>
               <tr>
-                <th style={{ width: '40px', textAlign: 'center' }}>#</th>
+                <th style={{ width: '48px', textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    className="sheet-checkbox"
+                    checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                    onChange={handleSelectAll}
+                    title="Select all events"
+                  />
+                </th>
                 <th className="sortable-th" onClick={() => handleSort('createdAt')}>
                   Date & Time {sortField === 'createdAt' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
                 </th>
@@ -1250,22 +1462,38 @@ function EventTimelineView({ events, learners, onSelectLearner, onDeleteEvent, o
                   Class {sortField === 'class' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
                 </th>
                 <th>Recorded Event & Details</th>
-                <th style={{ width: '50px', textAlign: 'center' }}>Erase</th>
+                <th style={{ width: '44px', textAlign: 'center' }}>Erase</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length > 0 ? (
                 filtered.map((ev, index) => {
                   const learner = ev.learnerId ? learnerMap.get(ev.learnerId) : null;
+                  const isRowSelected = selectedIds.has(ev.id);
 
                   return (
                     <tr 
                       key={ev.id} 
-                      className="sheet-row"
-                      onClick={() => learner && onSelectLearner && onSelectLearner(learner.id)}
+                      className={`sheet-row ${isRowSelected ? 'sheet-row-selected' : ''}`}
+                      onClick={() => {
+                        if (selectedIds.size > 0) {
+                          toggleSelectRow(ev.id);
+                        } else if (learner && onSelectLearner) {
+                          onSelectLearner(learner.id);
+                        }
+                      }}
+                      title={selectedIds.size > 0 ? "Click to toggle selection" : "Click to view full learner profile"}
                     >
-                      <td style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 11 }}>
-                        {index + 1}
+                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                          <input
+                            type="checkbox"
+                            className="sheet-checkbox"
+                            checked={isRowSelected}
+                            onChange={(e) => toggleSelectRow(ev.id, e)}
+                          />
+                          <span style={{ color: 'var(--muted)', fontSize: 10 }}>{index + 1}</span>
+                        </div>
                       </td>
                       <td style={{ whiteSpace: 'nowrap' }}>
                         <strong>{ev.date}</strong> <small style={{ color: 'var(--muted)' }}>{timeLabel(ev.createdAt)}</small>
@@ -1303,12 +1531,8 @@ function EventTimelineView({ events, learners, onSelectLearner, onDeleteEvent, o
                       <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                         <button
                           className="row-delete-btn"
-                          title="Erase this event in one click"
-                          onClick={() => {
-                            if (window.confirm('Erase this event from the system in one click?')) {
-                              onDeleteEvent && onDeleteEvent(ev.id);
-                            }
-                          }}
+                          title="Erase this event immediately"
+                          onClick={() => onDeleteEvent && onDeleteEvent(ev.id)}
                         >
                           <TrashIcon size={13} />
                         </button>
@@ -1755,6 +1979,68 @@ export default function App() {
     }
   };
 
+  const handleDeleteEventsBatch = async (ids) => {
+    if (!ids || ids.length === 0) return;
+    const idSet = new Set(ids);
+    setEvents(prev => prev.filter(e => !idSet.has(e.id)));
+    showToast(ids.length === 1 ? 'Event erased from memory.' : `${ids.length} events erased from memory.`);
+
+    try {
+      if (ids.length === 1) {
+        await api.deleteEvent(ids[0]);
+      } else {
+        await api.deleteEventsBatch(ids);
+      }
+      setBackendConnected(true);
+    } catch (err) {
+      console.warn('Events erased locally:', err.message);
+    }
+  };
+
+  const handleDeleteLearners = async (ids) => {
+    if (!ids || ids.length === 0) return;
+    const idSet = new Set(ids);
+    setLearners(prev => prev.filter(l => !idSet.has(l.id)));
+    setEvents(prev => prev.filter(e => !idSet.has(e.learnerId)));
+    showToast(ids.length === 1 ? 'Learner erased from directory.' : `${ids.length} learners erased from directory.`);
+
+    try {
+      if (ids.length === 1) {
+        await api.deleteLearner(ids[0]);
+      } else {
+        await api.deleteLearnersBatch(ids);
+      }
+      setBackendConnected(true);
+    } catch (err) {
+      console.warn('Learners erased locally:', err.message);
+    }
+  };
+
+  const handleClearColumn = async (colKey, affectedIds) => {
+    if (!colKey) return;
+    const idSet = new Set(affectedIds || []);
+    if (colKey === 'attendance') {
+      setEvents(prev => prev.filter(e => !(e.type === 'attendance' && idSet.has(e.learnerId))));
+      showToast('Attendance reset to 100% Present for selected learners.');
+      return;
+    }
+
+    setLearners(prev => prev.map(l => {
+      if (!idSet.has(l.id)) return l;
+      const updated = { ...l };
+      if (colKey === 'section') updated.section = '';
+      if (colKey === 'guardianName') updated.guardianName = '';
+      if (colKey === 'contact') {
+        updated.guardianPhone = '';
+        updated.email = '';
+      }
+      if (colKey === 'gender') updated.gender = '';
+      return updated;
+    }));
+
+    showToast(`Column data erased for ${affectedIds.length} learners.`);
+  };
+
   const handleClearAllEvents = async () => {
     setEvents([]);
     localStorage.removeItem('school_memory_events');
@@ -1839,6 +2125,9 @@ export default function App() {
             learners={scopedLearners}
             schoolMemory={schoolMemory}
             onSelectLearner={(id) => setSelectedLearnerId(id)}
+            onDeleteLearners={handleDeleteLearners}
+            onClearColumn={handleClearColumn}
+            onToast={showToast}
           />
         )}
 
@@ -1848,6 +2137,7 @@ export default function App() {
             learners={scopedLearners}
             onSelectLearner={(id) => setSelectedLearnerId(id)}
             onDeleteEvent={handleDeleteEvent}
+            onDeleteEventsBatch={handleDeleteEventsBatch}
             onClearAllEvents={handleClearAllEvents}
           />
         )}

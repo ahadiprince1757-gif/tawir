@@ -117,6 +117,36 @@ app.post('/api/students', (req, res) => {
   return app._router.handle(req, res);
 });
 
+// Delete single learner
+app.delete('/api/learners/:id', (req, res) => {
+  const { id } = req.params;
+  const db = readDb();
+  let current = db.learners || db.students || [];
+  db.learners = current.filter(l => l.id !== id);
+  db.students = db.learners;
+  if (db.events) {
+    db.events = db.events.filter(e => e.learnerId !== id);
+  }
+  writeDb(db);
+  res.json({ success: true, deleted: id, count: db.learners.length });
+});
+
+// Batch delete learners
+app.post('/api/learners/delete-batch', (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids array required' });
+  const idSet = new Set(ids);
+  const db = readDb();
+  let current = db.learners || db.students || [];
+  db.learners = current.filter(l => !idSet.has(l.id));
+  db.students = db.learners;
+  if (db.events) {
+    db.events = db.events.filter(e => !idSet.has(e.learnerId));
+  }
+  writeDb(db);
+  res.json({ success: true, count: db.learners.length, deletedCount: ids.length });
+});
+
 // Events Engine
 app.get('/api/events', (req, res) => {
   const db = readDb();
@@ -152,6 +182,17 @@ app.delete('/api/events/:id', (req, res) => {
   db.events = (db.events || []).filter(e => e.id !== id);
   writeDb(db);
   res.json({ success: true, deleted: id, count: db.events.length });
+});
+
+// Batch delete events
+app.post('/api/events/delete-batch', (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids array required' });
+  const idSet = new Set(ids);
+  const db = readDb();
+  db.events = (db.events || []).filter(e => !idSet.has(e.id));
+  writeDb(db);
+  res.json({ success: true, count: db.events.length, deletedCount: ids.length });
 });
 
 // Erase all recorded events

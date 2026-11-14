@@ -32,6 +32,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(learners),
     }),
+  deleteLearner: (learnerId) =>
+    request(`/learners/${learnerId}`, {
+      method: 'DELETE',
+    }),
+  deleteLearnersBatch: (ids) =>
+    request('/learners/delete-batch', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
 
   // Events (Operating Memory)
   getEvents: () => request('/events'),
@@ -43,6 +52,11 @@ export const api = {
   deleteEvent: (eventId) =>
     request(`/events/${eventId}`, {
       method: 'DELETE',
+    }),
+  deleteEventsBatch: (ids) =>
+    request('/events/delete-batch', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
     }),
   clearAllEvents: () =>
     request('/events', {
