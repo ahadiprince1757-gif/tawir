@@ -1,15 +1,13 @@
 /**
- * Enhanced Register Parser
+ * PURE DETERMINISTIC REGISTER PARSER & ANTI-HALLUCINATION ENGINE
  * 
- * High-precision parsing for physical & digital school attendance registers:
- * - Extracts clean full names (properly title-cased, handles "LAST, FIRST" format)
- * - Extracts admission numbers (STU-..., ADM 3021, #3021, 3021)
- * - Extracts gender (M/F/Male/Female)
- * - Extracts stream/section (A/B/C/Blue/Red/East/West)
- * - Extracts guardian contact if present (phone numbers)
- * - Strips attendance check-marks (P/A, 1/0, tick-marks, day numbers 1..31)
- * - Filters out document headers, totals, signatures, and noise
- * - STRICT ANTI-HALLUCINATION: Rejects random character noise, smudges, and non-name patterns
+ * Extracts real students from physical handwritten and printed school registers:
+ * - Parses columns: Index / Admission No / Full Name / Gender / Section / Attendance
+ * - Strips table grid dividers (|) and misrecognized border characters (l, I, !)
+ * - Strips attendance grids (P/A, 1/0, ticks, dots, percentages)
+ * - Converts "LAST, FIRST" format to natural "First Last"
+ * - Formats proper title casing (including O'Connor, Mwangi, etc.)
+ * - STRICT ANTI-HALLUCINATION: Discards smudges, paper noise, administrative headers, and non-name clusters
  */
 
 export function parseRegisterText(rawText = '', defaultClass = '') {
@@ -17,8 +15,8 @@ export function parseRegisterText(rawText = '', defaultClass = '') {
 
   const lines = rawText
     .split(/\r?\n/)
-    .map(l => l.trim())
-    .filter(l => l.length > 1);
+    .map((l) => l.trim())
+    .filter((l) => l.length > 1);
 
   const candidates = [];
   let currentClassContext = defaultClass.trim() || 'General';
@@ -27,19 +25,19 @@ export function parseRegisterText(rawText = '', defaultClass = '') {
   const classHeaderRegex = /\b(?:class|grade|stream|room|form)\s*[:\-]?\s*([a-z0-9\s]+)\b/i;
 
   for (const line of lines) {
-    // 1. Check if line specifies class context
+    // 1. Check if line sets a new class context
     const headerMatch = line.match(classHeaderRegex);
     if (headerMatch && headerMatch[1].trim().length > 1 && headerMatch[1].trim().length < 25) {
       currentClassContext = cleanClassName(headerMatch[1].trim());
       continue;
     }
 
-    // 2. Skip document administrative / summary lines
+    // 2. Skip document administrative / summary / signature lines
     if (isSystemHeaderLine(line)) {
       continue;
     }
 
-    // 3. Parse candidate line
+    // 3. Parse candidate student row
     const parsed = parseStudentLine(line, currentClassContext);
     if (parsed) {
       candidates.push(parsed);
@@ -54,33 +52,46 @@ function cleanClassName(str) {
     .replace(/[^\w\s]/g, '')
     .trim()
     .split(/\s+/)
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(' ');
 }
 
 function isSystemHeaderLine(line) {
   const lower = line.toLowerCase();
   
-  // Table headers & administrative lines
+  // Table headers & administrative terms
   const administrativeTerms = [
     'attendance register', 'roll call', 'class register', 'term 1', 'term 2', 'term 3',
-    'academic year', 'teacher:', 'date:', 'ministry of education', 'page ',
+    'academic year', 'teacher', 'signature', 'date:', 'ministry of education', 'page ',
     's/no', 'serial no', 'adm no', 'admission number', 'student name', 'learner name',
     'present', 'absent', 'total present', 'total absent', 'grand total', 'boys:', 'girls:',
-    'signature', 'remarks', 'headteacher', 'class teacher', 'percentage', 'termly',
+    'remarks', 'headteacher', 'class teacher', 'percentage', 'termly', 'checked by', 'verified by',
     'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
     'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'
   ];
 
-  if (administrativeTerms.some(term => lower.includes(term))) {
-    if (lower.startsWith('teacher:') || lower.startsWith('date:') || lower.includes('attendance register')) {
+  if (administrativeTerms.some((term) => lower.includes(term))) {
+    if (
+      lower.includes('teacher') ||
+      lower.includes('signature') ||
+      lower.includes('page ') ||
+      lower.includes('date:') ||
+      lower.includes('attendance register') ||
+      lower.includes('total') ||
+      lower.includes('roll call')
+    ) {
       return true;
     }
-    const headerWordCount = administrativeTerms.filter(t => lower.includes(t)).length;
+    const headerWordCount = administrativeTerms.filter((t) => lower.includes(t)).length;
     if (headerWordCount >= 2) return true;
   }
 
-  // Lines that are only numbers or punctuation (like a line of totals "18 20 22 90%")
+  // Lines with signature dots/dashes e.g. "Signature: ...................."
+  if (/[._\-]{5,}/.test(line)) {
+    return true;
+  }
+
+  // Lines that are only numbers or punctuation (like totals row "18 20 22 90%")
   if (/^[\d\s|.,+/%()\-#=_~]+$/.test(line)) {
     return true;
   }
@@ -94,6 +105,9 @@ export function parseStudentLine(line, fallbackClass) {
   // Strip table delimiters: "|", "+", "---"
   text = text.replace(/^[|+]+|[|+]+$/g, '').replace(/\|/g, ' ');
 
+  // Strip standalone table border artifacts (single letters like 'l', 'I', '!' left from '|' dividers)
+  text = text.replace(/(?:^|\s)[|!Il](?=\s|$)/g, ' ').trim();
+
   // 1. Extract phone number / contact if present
   let contact = '';
   const phoneMatch = text.match(/(?:\+?254|0)[17]\d{8}|\b(?:\+?1-?)?\d{3}[-.\s]\d{3}[-.\s]\d{4}\b/);
@@ -105,12 +119,12 @@ export function parseStudentLine(line, fallbackClass) {
   // 2. Extract admission number
   let admissionNumber = '';
   // Patterns like "STU-2026001", "ADM: 3021", "ADM/2026/012", "#3021", "No. 4021"
-  const prefixedAdmMatch = text.match(/\b(?:stu-?\d{4,8}|adm(?:ission)?(?:\s*no\.?)?[\/:\s-]*\w+|\#\d{3,7})\b/i);
+  const prefixedAdmMatch = text.match(/\b(?:stu-?\d{3,8}|adm(?:ission)?(?:\s*no\.?)?[\/:\s-]*\w+|\#\d{3,7})\b/i);
   if (prefixedAdmMatch) {
     admissionNumber = prefixedAdmMatch[0].replace(/^(?:adm(?:ission)?(?:\s*no\.?)?[\/:\s-]*|\#)/i, '').trim();
     text = text.replace(prefixedAdmMatch[0], ' ');
   } else {
-    // Standalone 3-6 digit number near beginning or end of line
+    // Standalone 3-6 digit number near beginning or end of line (avoiding years like 2026)
     const standaloneNumMatch = text.match(/(?:^|[\s,])(\d{3,6})(?:[\s,]|$)/);
     if (standaloneNumMatch && !/^(?:202[0-9]|19\d{2})$/.test(standaloneNumMatch[1])) {
       admissionNumber = standaloneNumMatch[1];
@@ -121,9 +135,9 @@ export function parseStudentLine(line, fallbackClass) {
   // 3. Strip row index: "1.", "1)", "1 ", "01.", "•"
   text = text.replace(/^[\d#.\-•)\s]+/, '').trim();
 
-  // 4. Extract Gender (M / F / Male / Female / Boy / Girl)
+  // 4. Extract Gender (M / F / Male / Female / Boy / Girl) with strict word boundaries
   let gender = '';
-  const genderMatch = text.match(/\b(male|female|boy|girl|[MF])\b/i);
+  const genderMatch = text.match(/(?:^|\s|\()(male|female|boy|girl|[MF])(?:\s|\)|$)/i);
   if (genderMatch) {
     const rawG = genderMatch[1].toUpperCase();
     gender = rawG.startsWith('F') || rawG === 'GIRL' ? 'Female' : 'Male';
@@ -139,8 +153,8 @@ export function parseStudentLine(line, fallbackClass) {
   }
 
   // 6. Strip attendance tick marks at the end of the line:
-  // e.g. "P P A P P", "1 0 1 1", "P. P. A.", "18/20", "95%"
-  text = text.replace(/(?:\s+(?:[PAX\u2713\u2714\u2717\u2718]|[01]|present|absent)\.?)+\s*$/i, '');
+  // e.g. "P P A P P", "1 0 1 1", "P. P. A.", "18/20", "95%", ". . a . ."
+  text = text.replace(/(?:\s+(?:[PAX\u2713\u2714\u2717\u2718]|[01]|present|absent|[.a])\.?)+\s*$/i, '');
   text = text.replace(/\s+\d{1,2}\/\d{1,2}\s*$/, '');
   text = text.replace(/\s+\d{1,3}%\s*$/, '');
   text = text.replace(/\s+\d{1,2}\s*$/, '');
@@ -150,7 +164,7 @@ export function parseStudentLine(line, fallbackClass) {
 
   // 8. Handle "LAST, FIRST" name format (e.g. "Mwangi, Brian" -> "Brian Mwangi")
   if (text.includes(',')) {
-    const parts = text.split(',').map(p => p.trim());
+    const parts = text.split(',').map((p) => p.trim());
     if (parts.length === 2 && parts[0] && parts[1]) {
       text = `${parts[1]} ${parts[0]}`;
     }
@@ -159,34 +173,37 @@ export function parseStudentLine(line, fallbackClass) {
   // 9. Extract alphabetic words that form a realistic student name
   const nameWords = text
     .split(/\s+/)
-    .map(w => w.replace(/[^a-zA-Z'\-]/g, ''))
-    .filter(w => w.length > 1);
+    .map((w) => w.replace(/[^a-zA-Z'\-]/g, ''))
+    .filter((w) => w.length > 1);
 
   if (nameWords.length === 0) return null;
 
-  // Filter out any administrative keywords that aren't names
+  // Filter out any administrative and non-name words
   const nonNameKeywords = new Set([
     'total', 'present', 'absent', 'average', 'remarks', 'pass', 'fail',
     'score', 'grade', 'class', 'stream', 'gender', 'contact', 'name', 'date',
-    'serial', 'number', 'term', 'week', 'day', 'sign', 'signature', 'year', 'month'
+    'serial', 'number', 'term', 'week', 'day', 'sign', 'signature', 'year', 'month',
+    'teacher', 'page', 'of', 'for', 'the', 'and', 'school', 'register', 'form',
+    'adm', 'admission', 'sec', 'section', 'boy', 'girl', 'male', 'female'
   ]);
 
-  const cleanWords = nameWords.filter(w => !nonNameKeywords.has(w.toLowerCase()));
+  const cleanWords = nameWords.filter((w) => !nonNameKeywords.has(w.toLowerCase()));
   if (cleanWords.length === 0) return null;
 
-  // Title-case formatting and gibberish rejection
-  const validWords = cleanWords.filter(w => !isGibberishWord(w));
+  // Title-case formatting and strict phonetic gibberish rejection
+  const validWords = cleanWords.filter((w) => !isGibberishWord(w));
   if (validWords.length === 0) return null;
 
   const fullName = validWords
-    .map(w => {
+    .map((w) => {
       if (w.includes("'")) {
-        return w.split("'").map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join("'");
+        return w.split("'").map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join("'");
       }
       return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
     })
     .join(' ');
 
+  // Reject single-letter remnants or gibberish names
   if (fullName.length < 3 || isGibberishName(fullName)) return null;
 
   return {
@@ -202,7 +219,7 @@ export function parseStudentLine(line, fallbackClass) {
 }
 
 /**
- * Detects OCR hallucinated noise / gibberish generated from blurred or damaged paper
+ * Detects OCR hallucinated noise / gibberish generated from paper smudges, wrinkles, or blur
  */
 export function isGibberishWord(word = '') {
   const w = word.trim().toLowerCase();
@@ -213,7 +230,7 @@ export function isGibberishWord(word = '') {
     return true;
   }
 
-  // Reject unnatural consonant clusters (e.g. "xkpth", "qzrbm", "strng" if > 4 non-vowels)
+  // Reject unnatural consonant clusters (e.g. "xkpth", "qzrbm")
   if (/[bcdfghjklmnpqrstvwxz]{5,}/.test(w)) {
     return true;
   }
@@ -224,7 +241,7 @@ export function isGibberishWord(word = '') {
   }
 
   // Reject words with impossible letter combinations
-  if (/(?:qx|qz|jx|qj|wq|zx|xx|jj)/.test(w)) {
+  if (/(?:qx|qz|jx|qj|wq|zx|xx|jj|vvv)/.test(w)) {
     return true;
   }
 
@@ -236,6 +253,6 @@ export function isGibberishName(name = '') {
   if (parts.length === 0) return true;
 
   const gibberishCount = parts.filter(isGibberishWord).length;
-  // If more than 35% of the words are gibberish, the whole line is noise
-  return gibberishCount / parts.length > 0.35;
+  // If more than 30% of the words are gibberish, the whole line is noise
+  return gibberishCount / parts.length > 0.30;
 }

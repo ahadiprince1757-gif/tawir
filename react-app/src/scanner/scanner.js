@@ -3,17 +3,21 @@ import { parseRegisterText, isGibberishName } from './registerParser.js';
 import { validateAndDeduplicate } from './registerValidator.js';
 
 /**
- * Super Scanner Computer Vision Preprocessor:
- * Designed to handle blurry camera shots, uneven shadows, and low-contrast handwriting.
+ * PURE HARD-CODED COMPUTER VISION ENGINE FOR PHYSICAL SCHOOL REGISTERS
+ * 100% Client-Side In-Browser Pipeline — Zero External AI / Zero APIs
  * 
  * Pipeline:
- * 1. Rescale to optimal OCR resolution (1600-2400px longest edge)
- * 2. Background Illumination Normalization (Shadow flattening via flatfield division):
- *    Divides pixel values by a low-frequency background map to erase phone shadows and uneven lighting.
- * 3. Laplacian Unsharp Mask Deblurring:
- *    Recovers crisp stroke edges from optical motion blur and soft focus.
- * 4. Dynamic Contrast Stretching:
- *    Maps faint pencil/ballpoint ink into dark readable strokes on pure white paper.
+ * 1. Geometric Scaling: Rescales image to optimal stroke DPI (1800 - 2400px)
+ * 2. Flat-field Illumination Normalization (Shadow & Lighting Gradient Flattening):
+ *    Estimates low-frequency background luminosity map B(x,y) and divides I(x,y) by B(x,y).
+ *    Result: Paper shadows, desk shadows, and lighting falloff disappear completely, turning
+ *    paper pure white (245-255) while preserving handwriting and printed ink.
+ * 3. Laplacian Unsharp Mask Deblurring (3x3 Convolution):
+ *    Restores sharp edge transitions to out-of-focus camera shots and motion blur.
+ * 4. Table Grid Attenuation:
+ *    Suppresses continuous vertical border lines so table borders '|' don't get misread as 'l' or '1'.
+ * 5. Adaptive Contrast Expansion (Sauvola-inspired):
+ *    Separates faint pencil and ballpoint strokes cleanly from the paper background.
  */
 export async function preprocessImage(imageInput) {
   return new Promise((resolve) => {
@@ -24,69 +28,64 @@ export async function preprocessImage(imageInput) {
       try {
         let width = img.width;
         let height = img.height;
-        const maxDim = 2200;
-        const minDim = 1500;
+        const targetLongEdge = 2200;
 
-        // Scale to optimal character stroke resolution
-        if (Math.max(width, height) > maxDim) {
-          const scale = maxDim / Math.max(width, height);
-          width = Math.round(width * scale);
-          height = Math.round(height * scale);
-        } else if (Math.max(width, height) < minDim && Math.max(width, height) > 0) {
-          const scale = minDim / Math.max(width, height);
+        // Scale image to crisp resolution for character stroke recognition
+        if (Math.max(width, height) > 0) {
+          const scale = targetLongEdge / Math.max(width, height);
           width = Math.round(width * scale);
           height = Math.round(height * scale);
         }
 
-        // Main processing canvas
         const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         ctx.drawImage(img, 0, 0, width, height);
 
         const imgData = ctx.getImageData(0, 0, width, height);
         const data = imgData.data;
         const numPixels = width * height;
 
-        // Step 1: Grayscale conversion (Rec. 601 luma)
+        // Step 1: Grayscale conversion (Standard Rec. 601 luma)
         const gray = new Uint8Array(numPixels);
         for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-          gray[j] = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+          gray[j] = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8;
         }
 
-        // Step 2: Background Illumination Map via downscaled blur (Flatfield division)
-        // Downscale to 1/16th size to extract low-frequency illumination gradients (shadows)
-        const bgSmallW = Math.max(16, Math.round(width / 16));
-        const bgSmallH = Math.max(16, Math.round(height / 16));
+        // Step 2: Flatfield Background Illumination Map (Downscaled Gaussian-like blur)
+        // Downscale to 1/16th size to extract lighting gradients (shadows)
+        const bgW = Math.max(16, Math.round(width / 16));
+        const bgH = Math.max(16, Math.round(height / 16));
 
-        const bgSmallCanvas = document.createElement('canvas');
-        bgSmallCanvas.width = bgSmallW;
-        bgSmallCanvas.height = bgSmallH;
-        const bgSmallCtx = bgSmallCanvas.getContext('2d');
-        bgSmallCtx.imageSmoothingEnabled = true;
-        bgSmallCtx.drawImage(canvas, 0, 0, bgSmallW, bgSmallH);
+        const bgCanvas = document.createElement('canvas');
+        bgCanvas.width = bgW;
+        bgCanvas.height = bgH;
+        const bgCtx = bgCanvas.getContext('2d');
+        bgCtx.imageSmoothingEnabled = true;
+        bgCtx.drawImage(canvas, 0, 0, bgW, bgH);
 
-        // Upscale blurred background back to full image dimensions
+        // Upscale background map back to full size with bilinear smoothing
         const bgFullCanvas = document.createElement('canvas');
         bgFullCanvas.width = width;
         bgFullCanvas.height = height;
         const bgFullCtx = bgFullCanvas.getContext('2d');
         bgFullCtx.imageSmoothingEnabled = true;
-        bgFullCtx.drawImage(bgSmallCanvas, 0, 0, width, height);
+        bgFullCtx.drawImage(bgCanvas, 0, 0, width, height);
 
         const bgData = bgFullCtx.getImageData(0, 0, width, height).data;
 
-        // Step 3: Flatfield Division + Laplacian Deblurring
-        // Divide original grayscale by local background brightness to eliminate shadows
+        // Step 3: Flatfield Division (Shadow Removal)
+        // Divide original grayscale by local background luminosity
         const normalized = new Uint8Array(numPixels);
         for (let j = 0; j < numPixels; j++) {
-          const bgVal = Math.max(20, Math.round(0.299 * bgData[j * 4] + 0.587 * bgData[j * 4 + 1] + 0.114 * bgData[j * 4 + 2]));
-          const norm = Math.min(255, Math.round((gray[j] / bgVal) * 235));
+          const bgLuma = Math.max(25, (bgData[j * 4] * 77 + bgData[j * 4 + 1] * 150 + bgData[j * 4 + 2] * 29) >> 8);
+          // Scale: if gray == bgLuma -> 235 (white paper). If gray is darker -> proportionally darker ink.
+          const norm = Math.min(255, Math.round((gray[j] / bgLuma) * 235));
           normalized[j] = norm;
         }
 
-        // Step 4: Laplacian Unsharp Mask Filter (3x3 kernel) to deblur handwriting edges
+        // Step 4: Laplacian Unsharp Mask Filter (3x3 Kernel) to deblur handwriting edges
         //  0  -1   0
         // -1   5  -1
         //  0  -1   0
@@ -106,30 +105,48 @@ export async function preprocessImage(imageInput) {
           }
         }
 
-        // Step 5: Adaptive Local Contrast Leveling
-        // Turns paper background solid clean white while preserving ink strokes
-        for (let y = 0; y < height; y++) {
-          for (let x = 0; x < width; x++) {
+        // Step 5: Table Grid Line Attenuation
+        // Continuous vertical black lines (column separators) longer than 50px get attenuated
+        // so OCR does not confuse them with 'l', '1', or 'I'
+        const cleanInk = new Uint8Array(sharpened);
+        for (let x = 2; x < width - 2; x++) {
+          let continuousDark = 0;
+          for (let y = 0; y < height; y++) {
             const idx = y * width + x;
-            let val = (x === 0 || x === width - 1 || y === 0 || y === height - 1)
-              ? normalized[idx]
-              : sharpened[idx];
-
-            // Ink thresholding: If pixel is significantly darker than paper background (~215),
-            // amplify ink darkness; otherwise push to pure white paper
-            if (val < 195) {
-              // Stretch ink contrast
-              val = Math.max(0, Math.round((val / 195) * 110));
+            if (sharpened[idx] < 140) {
+              continuousDark++;
             } else {
-              val = 255;
+              if (continuousDark > 45) {
+                // If it was a continuous vertical grid line, soften it to light gray
+                for (let k = y - continuousDark; k < y; k++) {
+                  const lineIdx = k * width + x;
+                  // If neighbors left and right are light, this is purely a vertical ruling line
+                  if (sharpened[lineIdx - 1] > 180 && sharpened[lineIdx + 1] > 180) {
+                    cleanInk[lineIdx] = 230;
+                  }
+                }
+              }
+              continuousDark = 0;
             }
-
-            const dIdx = idx * 4;
-            data[dIdx] = val;
-            data[dIdx + 1] = val;
-            data[dIdx + 2] = val;
-            data[dIdx + 3] = 255;
           }
+        }
+
+        // Step 6: Dynamic Ink Contrast Expansion
+        // Push background paper to pure 255, and stretch real ink strokes to crisp dark text
+        for (let i = 0; i < numPixels; i++) {
+          let val = cleanInk[i];
+          if (val < 195) {
+            // Stretch ink contrast
+            val = Math.max(0, Math.round((val / 195) * 115));
+          } else {
+            val = 255;
+          }
+
+          const dIdx = i * 4;
+          data[dIdx] = val;
+          data[dIdx + 1] = val;
+          data[dIdx + 2] = val;
+          data[dIdx + 3] = 255;
         }
 
         ctx.putImageData(imgData, 0, 0);
@@ -155,58 +172,72 @@ export async function preprocessImage(imageInput) {
 }
 
 /**
- * High-accuracy OCR with confidence filtering and hallucination prevention
+ * Pure In-Browser OCR Engine using Single Block Page Segmentation (PSM 6)
+ * Configured specifically for tabular registers to preserve row order and prevent column bleed.
  */
 export async function recognizeText(image, onProgress) {
-  let processedSource = image;
+  let processedCanvas = image;
   try {
-    if (onProgress) onProgress(5);
-    processedSource = await preprocessImage(image);
-    if (onProgress) onProgress(15);
+    if (onProgress) onProgress(10);
+    processedCanvas = await preprocessImage(image);
+    if (onProgress) onProgress(25);
   } catch (err) {
     console.warn('Image preprocessing fallback:', err);
   }
 
-  const result = await Tesseract.recognize(processedSource, 'eng', {
+  // Create local Tesseract worker with PSM 6 (Single uniform block of text / tabular lines)
+  const worker = await Tesseract.createWorker('eng', 1, {
     logger: (m) => {
       if (m.status === 'recognizing text' && onProgress) {
-        const scaled = Math.round(15 + m.progress * 80);
+        const scaled = Math.round(25 + m.progress * 70);
         onProgress(scaled);
       }
     },
   });
 
-  if (onProgress) onProgress(98);
+  try {
+    // Set deterministic OCR parameters:
+    // PSM 6 = Assume a single uniform block of text (maintains line-by-line register rows)
+    await worker.setParameters({
+      tessedit_pageseg_mode: '6',
+      preserve_interword_spaces: '1',
+    });
 
-  const data = result.data;
-  if (data.lines && data.lines.length > 0) {
-    const validLines = data.lines
-      .filter(line => {
-        const text = line.text.trim();
-        if (text.length < 2) return false;
+    const result = await worker.recognize(processedCanvas);
+    if (onProgress) onProgress(98);
 
-        // Discard lines with very low confidence (< 40%) unless they contain a definite admission number
-        const hasAdmNumber = /\b\d{3,6}\b/.test(text);
-        if (line.confidence < 40 && !hasAdmNumber) {
-          return false;
-        }
+    const data = result.data;
+    if (data.lines && data.lines.length > 0) {
+      const validLines = data.lines
+        .filter((line) => {
+          const text = line.text.trim();
+          if (text.length < 2) return false;
 
-        // Discard pure gibberish / hallucinated noise
-        if (isGibberishName(text)) {
-          return false;
-        }
+          // Discard lines with very low confidence (< 35%) unless they contain an admission number
+          const hasAdmNumber = /\b\d{3,6}\b/.test(text);
+          if (line.confidence < 35 && !hasAdmNumber) {
+            return false;
+          }
 
-        return true;
-      })
-      .map(line => line.text.trim())
-      .filter(Boolean);
+          // Discard pure gibberish noise lines
+          if (isGibberishName(text)) {
+            return false;
+          }
+
+          return true;
+        })
+        .map((line) => line.text.trim())
+        .filter(Boolean);
+
+      if (onProgress) onProgress(100);
+      return validLines.join('\n');
+    }
 
     if (onProgress) onProgress(100);
-    return validLines.join('\n');
+    return data.text || '';
+  } finally {
+    await worker.terminate();
   }
-
-  if (onProgress) onProgress(100);
-  return data.text || '';
 }
 
 export function processScannedDocument(rawText, defaultClass = '', existingLearners = []) {
