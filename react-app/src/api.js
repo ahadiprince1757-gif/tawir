@@ -40,6 +40,18 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(event),
     }),
+  deleteEvent: (eventId) =>
+    request(`/events/${eventId}`, {
+      method: 'DELETE',
+    }),
+  clearAllEvents: () =>
+    request('/events', {
+      method: 'DELETE',
+    }),
+  resetSystem: () =>
+    request('/reset', {
+      method: 'POST',
+    }),
   toggleAttendance: (dateKey, learnerId) =>
     request('/attendance/toggle', {
       method: 'POST',

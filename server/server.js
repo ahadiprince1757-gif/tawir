@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { readDb, writeDb } from './db.js';
@@ -141,6 +142,43 @@ app.post('/api/events', (req, res) => {
   db.events = [event, ...(db.events || [])];
   writeDb(db);
   res.status(201).json(event);
+});
+
+// Delete a single event
+app.delete('/api/events/:id', (req, res) => {
+  const { id } = req.params;
+  const db = readDb();
+  const beforeCount = (db.events || []).length;
+  db.events = (db.events || []).filter(e => e.id !== id);
+  writeDb(db);
+  res.json({ success: true, deleted: id, count: db.events.length });
+});
+
+// Erase all recorded events
+app.delete('/api/events', (req, res) => {
+  const db = readDb();
+  db.events = [];
+  writeDb(db);
+  res.json({ success: true, message: 'All events erased', count: 0 });
+});
+
+// Reset system to pristine seed state
+app.post('/api/reset', (req, res) => {
+  const seedPath = path.join(__dirname, 'data', 'seed.json');
+  try {
+    if (fs.existsSync(seedPath)) {
+      const seedRaw = fs.readFileSync(seedPath, 'utf8');
+      const seedData = JSON.parse(seedRaw);
+      writeDb(seedData);
+      return res.json({ success: true, learners: seedData.learners, events: seedData.events });
+    }
+  } catch (err) {
+    console.error('Error reading seed.json:', err);
+  }
+  const db = readDb();
+  db.events = [];
+  writeDb(db);
+  res.json({ success: true, learners: db.learners || [], events: [] });
 });
 
 // Toggle Attendance via Event Stream

@@ -1261,3 +1261,184 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
     text-align: center;
   }
 }
+
+/* ── Erase Data & 1-Click System Reset ── */
+.mobile-header-erase-btn {
+  background: var(--soft);
+  border: 1px solid var(--line);
+  color: #7a827c;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.mobile-header-erase-btn:hover {
+  background: #fdf0f0;
+  border-color: #f5c2c2;
+  color: #c93b3b;
+}
+
+.sidebar-erase-container {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.sidebar-erase-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px dashed var(--line);
+  color: #7a827c;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sidebar-erase-btn:hover {
+  background: #fdf0f0;
+  border-color: #f5c2c2;
+  color: #c93b3b;
+}
+
+.btn-erase-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid #f0cccc;
+  color: #c93b3b;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-erase-all:hover {
+  background: #fdf0f0;
+  border-color: #e59999;
+}
+
+.row-delete-btn {
+  background: transparent;
+  border: none;
+  color: #a4aca6;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.row-delete-btn:hover {
+  background: #fdf0f0;
+  color: #c93b3b;
+}
+
+/* Erase Modal */
+.erase-modal-card {
+  max-width: 480px !important;
+  border-radius: 20px;
+  padding: 24px;
+}
+
+.erase-icon-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #fdf0f0;
+  color: #c93b3b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.erase-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.erase-option-card {
+  background: #fafbfa;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.erase-option-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.erase-option-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+  margin-top: 3px;
+}
+
+.erase-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  align-self: flex-start;
+}
+
+.erase-btn-danger {
+  background: #c93b3b;
+  color: #ffffff;
+}
+
+.erase-btn-danger:hover:not(:disabled) {
+  background: #b02e2e;
+}
+
+.erase-btn-danger:disabled {
+  background: #e6e8e6;
+  color: #a0a6a2;
+  cursor: not-allowed;
+}
+
+.erase-btn-secondary {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.erase-btn-secondary:hover {
+  background: var(--soft);
+  border-color: #c8d0c9;
+}

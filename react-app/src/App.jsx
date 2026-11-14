@@ -14,7 +14,9 @@ import {
   SearchIcon, 
   AlertTriangleIcon, 
   CheckIcon, 
-  XIcon 
+  XIcon,
+  TrashIcon,
+  RotateCcwIcon
 } from './Icons.jsx';
 import { api } from './api.js';
 import './App.css';
@@ -162,7 +164,7 @@ function GlobalSearchBar({ learners, schoolMemory, onSelectLearner }) {
 /*  MOBILE HEADER NAV & BOTTOM NAV BAR                                    */
 /* ══════════════════════════════════════════════════════════════════════════ */
 
-function MobileHeaderNav({ onNavigate, backendConnected, activeClassScope, onSelectClassScope, availableClasses }) {
+function MobileHeaderNav({ onNavigate, backendConnected, activeClassScope, onSelectClassScope, availableClasses, onOpenEraseModal }) {
   return (
     <header className="mobile-header">
       <div className="mobile-brand" onClick={() => onNavigate('today')}>
@@ -170,7 +172,7 @@ function MobileHeaderNav({ onNavigate, backendConnected, activeClassScope, onSel
         <span className="mobile-brand-title">Tawir</span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <select
           className="header-scope-select"
           value={activeClassScope}
@@ -184,6 +186,15 @@ function MobileHeaderNav({ onNavigate, backendConnected, activeClassScope, onSel
             </option>
           ))}
         </select>
+
+        <button
+          className="mobile-header-erase-btn"
+          onClick={onOpenEraseModal}
+          title="Erase inserted data / Reset system"
+          aria-label="Erase system data"
+        >
+          <TrashIcon size={14} />
+        </button>
 
         <div className="mobile-status-indicator">
           <span
@@ -250,7 +261,7 @@ function BottomNav({ view, onNavigate, learnerCount }) {
 /*  SIDEBAR (DESKTOP)                                                      */
 /* ══════════════════════════════════════════════════════════════════════════ */
 
-function Sidebar({ view, onNavigate, backendConnected, learnerCount, activeClassScope, onSelectClassScope, availableClasses }) {
+function Sidebar({ view, onNavigate, backendConnected, learnerCount, activeClassScope, onSelectClassScope, availableClasses, onOpenEraseModal }) {
   return (
     <aside>
       <div className="brand brand-container" onClick={() => onNavigate('today')} style={{ cursor: 'pointer' }}>
@@ -297,6 +308,17 @@ function Sidebar({ view, onNavigate, backendConnected, learnerCount, activeClass
           Scan Register
         </button>
       </nav>
+
+      <div className="sidebar-erase-container">
+        <button 
+          className="sidebar-erase-btn"
+          onClick={onOpenEraseModal}
+          title="Erase inserted data or reset system"
+        >
+          <TrashIcon size={14} />
+          <span>Erase Data / Reset</span>
+        </button>
+      </div>
 
       <div className="aside-note">
         <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1111,7 +1133,7 @@ function LearnersView({ learners, schoolMemory, onSelectLearner }) {
 /*  EVENT TIMELINE VIEW                                                    */
 /* ══════════════════════════════════════════════════════════════════════════ */
 
-function EventTimelineView({ events, learners, onSelectLearner }) {
+function EventTimelineView({ events, learners, onSelectLearner, onDeleteEvent, onClearAllEvents }) {
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState('createdAt'); // 'createdAt' | 'type' | 'learner' | 'class'
   const [sortDirection, setSortDirection] = useState('desc'); // 'desc' | 'asc'
@@ -1179,18 +1201,34 @@ function EventTimelineView({ events, learners, onSelectLearner }) {
     <section className="view active">
       <div className="page-head">
         <div>
-          <div className="eyebrow">Immutable Log</div>
+          <div className="eyebrow">Operating Memory Log</div>
           <h1>School Memory Event Stream</h1>
           <div className="sub">
             Complete audit trail of all recorded actions, attendance events, and academic updates. Click column headers to sort.
           </div>
         </div>
-        <input
-          className="search"
-          placeholder="Filter events by learner, admission no, or type..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            className="search"
+            placeholder="Filter events by learner, admission no, or type..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {events.length > 0 && (
+            <button
+              className="btn-erase-all"
+              onClick={() => {
+                if (window.confirm(`Are you sure you want to erase all ${events.length} events in one click?`)) {
+                  onClearAllEvents && onClearAllEvents();
+                }
+              }}
+              title="Erase all events in one click"
+            >
+              <TrashIcon size={13} />
+              <span>Erase All ({events.length})</span>
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
@@ -1212,6 +1250,7 @@ function EventTimelineView({ events, learners, onSelectLearner }) {
                   Class {sortField === 'class' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
                 </th>
                 <th>Recorded Event & Details</th>
+                <th style={{ width: '50px', textAlign: 'center' }}>Erase</th>
               </tr>
             </thead>
             <tbody>
@@ -1261,12 +1300,25 @@ function EventTimelineView({ events, learners, onSelectLearner }) {
                           </strong>
                         )}
                       </td>
+                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          className="row-delete-btn"
+                          title="Erase this event in one click"
+                          onClick={() => {
+                            if (window.confirm('Erase this event from the system in one click?')) {
+                              onDeleteEvent && onDeleteEvent(ev.id);
+                            }
+                          }}
+                        >
+                          <TrashIcon size={13} />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan="6" className="empty">No events matching search.</td>
+                  <td colSpan="7" className="empty">No events matching search.</td>
                 </tr>
               )}
             </tbody>
@@ -1463,6 +1515,88 @@ function ScannerView({ existingLearners, onImportLearners, onToast }) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════ */
+/*  ERASE DATA MODAL (1-CLICK DATA REMOVAL & RESET)                       */
+/* ══════════════════════════════════════════════════════════════════════════ */
+
+function EraseDataModal({ isOpen, onClose, onClearAllEvents, onResetSystem, eventCount }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal erase-modal-card" onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="erase-icon-badge">
+              <TrashIcon size={18} />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 18 }}>Erase System Data</h2>
+              <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 2 }}>
+                One-click data removal and system reset
+              </div>
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose}>
+            <XIcon size={14} />
+          </button>
+        </div>
+
+        <div className="erase-options-list">
+          <div className="erase-option-card">
+            <div className="erase-option-info">
+              <div className="erase-option-title">Erase All Inserted Events</div>
+              <div className="erase-option-desc">
+                Permanently wipes all {eventCount} recorded events, notes, quiz scores, and daily attendance records in one click. All registered learners return to 100% presence.
+              </div>
+            </div>
+            <button
+              className="erase-action-btn erase-btn-danger"
+              disabled={eventCount === 0}
+              onClick={() => {
+                if (window.confirm('Erase all recorded events from the system in one click?')) {
+                  onClearAllEvents();
+                  onClose();
+                }
+              }}
+            >
+              <TrashIcon size={13} />
+              <span>Erase All Events ({eventCount})</span>
+            </button>
+          </div>
+
+          <div className="erase-option-card" style={{ marginTop: 14 }}>
+            <div className="erase-option-info">
+              <div className="erase-option-title">Reset System to Seed State</div>
+              <div className="erase-option-desc">
+                Restores the standard 100-student directory and default setup, removing any test imports from the register scanner.
+              </div>
+            </div>
+            <button
+              className="erase-action-btn erase-btn-secondary"
+              onClick={() => {
+                if (window.confirm('Reset the entire system back to pristine seed data?')) {
+                  onResetSystem();
+                  onClose();
+                }
+              }}
+            >
+              <RotateCcwIcon size={13} />
+              <span>Reset to Seed State</span>
+            </button>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
+          <button className="pill" onClick={onClose} style={{ padding: '6px 16px', fontSize: 12, cursor: 'pointer' }}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════ */
 /*  MAIN ROOT COMPONENT                                                    */
 /* ══════════════════════════════════════════════════════════════════════════ */
 
@@ -1471,6 +1605,7 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState('');
   const [backendConnected, setBackendConnected] = useState(false);
   const [selectedLearnerId, setSelectedLearnerId] = useState(null);
+  const [isEraseModalOpen, setIsEraseModalOpen] = useState(false);
   const [activeClassScope, setActiveClassScope] = useState(() => {
     return localStorage.getItem('tawir_user_class_scope') || 'ALL';
   });
@@ -1608,6 +1743,53 @@ export default function App() {
     }
   };
 
+  const handleDeleteEvent = async (eventId) => {
+    setEvents(prev => prev.filter(e => e.id !== eventId));
+    showToast('Event erased from memory.');
+
+    try {
+      await api.deleteEvent(eventId);
+      setBackendConnected(true);
+    } catch (err) {
+      console.warn('Event deleted locally (backend sync pending):', err.message);
+    }
+  };
+
+  const handleClearAllEvents = async () => {
+    setEvents([]);
+    localStorage.removeItem('school_memory_events');
+    showToast('All recorded events erased from the system.');
+
+    try {
+      await api.clearAllEvents();
+      setBackendConnected(true);
+    } catch (err) {
+      console.warn('Events cleared locally (backend sync pending):', err.message);
+    }
+  };
+
+  const handleResetSystem = async () => {
+    try {
+      const res = await api.resetSystem();
+      if (res && res.learners) {
+        setLearners(res.learners.map(createLearner));
+        setEvents((res.events || []).map(createEvent));
+        localStorage.setItem('school_memory_learners', JSON.stringify(res.learners));
+        localStorage.setItem('school_memory_events', JSON.stringify(res.events || []));
+      } else {
+        setEvents([]);
+        localStorage.removeItem('school_memory_events');
+      }
+      setBackendConnected(true);
+      showToast('System reset to default seed state.');
+    } catch (err) {
+      console.warn('Resetting locally:', err.message);
+      setEvents([]);
+      localStorage.removeItem('school_memory_events');
+      showToast('Events erased (offline mode).');
+    }
+  };
+
   return (
     <div className="app">
       {/* Mobile Top Header Nav */}
@@ -1617,6 +1799,7 @@ export default function App() {
         activeClassScope={activeClassScope}
         onSelectClassScope={handleSelectClassScope}
         availableClasses={availableClasses}
+        onOpenEraseModal={() => setIsEraseModalOpen(true)}
       />
 
       {/* Desktop Sidebar (hidden on mobile) */}
@@ -1628,6 +1811,7 @@ export default function App() {
         activeClassScope={activeClassScope}
         onSelectClassScope={handleSelectClassScope}
         availableClasses={availableClasses}
+        onOpenEraseModal={() => setIsEraseModalOpen(true)}
       />
 
       <main>
@@ -1663,6 +1847,8 @@ export default function App() {
             events={scopedEvents}
             learners={scopedLearners}
             onSelectLearner={(id) => setSelectedLearnerId(id)}
+            onDeleteEvent={handleDeleteEvent}
+            onClearAllEvents={handleClearAllEvents}
           />
         )}
 
@@ -1690,6 +1876,15 @@ export default function App() {
           onClose={() => setSelectedLearnerId(null)}
         />
       )}
+
+      {/* 1-Click Erase Data & Reset Modal */}
+      <EraseDataModal
+        isOpen={isEraseModalOpen}
+        onClose={() => setIsEraseModalOpen(false)}
+        onClearAllEvents={handleClearAllEvents}
+        onResetSystem={handleResetSystem}
+        eventCount={events.length}
+      />
 
       <Toast message={toastMessage} />
     </div>
