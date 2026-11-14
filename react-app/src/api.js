@@ -71,4 +71,16 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ dateKey, learnerId }),
     }),
+
+  // AI Vision Scanner
+  saveGeminiKey: (apiKey) =>
+    request('/settings/gemini-key', {
+      method: 'POST',
+      body: JSON.stringify({ apiKey }),
+    }),
+  scanWithAiVision: ({ imageBase64, mimeType, defaultClass, apiKey }) =>
+    request('/scan/ai-vision', {
+      method: 'POST',
+      body: JSON.stringify({ imageBase64, mimeType, defaultClass, apiKey }),
+    }),
 };

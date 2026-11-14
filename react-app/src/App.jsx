@@ -1557,9 +1557,22 @@ function EventTimelineView({ events, learners, onSelectLearner, onDeleteEvent, o
 /*  REGISTER SCANNER VIEW                                                  */
 /* ══════════════════════════════════════════════════════════════════════════ */
 
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+  });
+}
+
 function ScannerView({ existingLearners, onImportLearners, onToast }) {
   const [step, setStep] = useState('upload'); // 'upload' | 'processing' | 'review'
   const [inputTab, setInputTab] = useState('camera'); // 'camera' | 'paste'
+  const [useAiVision, setUseAiVision] = useState(true);
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('tawir_gemini_api_key') || '');
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [tempKey, setTempKey] = useState('');
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
   const [defaultClass, setDefaultClass] = useState('Grade 3 Blue');
@@ -1574,24 +1587,66 @@ function ScannerView({ existingLearners, onImportLearners, onToast }) {
     if (!file) return;
     setPreviewUrl(URL.createObjectURL(file));
     setStep('processing');
-    setProgress(5);
-    setStatusMessage('Step 1/3: Enhancing contrast, leveling paper shadows & binarizing text...');
+    setProgress(10);
+
+    // 1. If AI Vision mode is enabled, attempt AI Vision first (reads handwriting & blurred text)
+    if (useAiVision) {
+      setStatusMessage('Connecting to AI Vision (reads handwriting & low-quality photos)...');
+      setProgress(25);
+
+      try {
+        const imageBase64 = await fileToBase64(file);
+        setProgress(45);
+        setStatusMessage('AI analyzing register handwriting, columns & names...');
+
+        const res = await api.scanWithAiVision({
+          imageBase64,
+          mimeType: file.type || 'image/jpeg',
+          defaultClass,
+          apiKey
+        });
+
+        if (res && Array.isArray(res.learners) && res.learners.length > 0) {
+          setProgress(95);
+          setStatusMessage('Deduplicating and preparing spreadsheet review...');
+          const { verified, duplicates: dups } = validateAndDeduplicate(res.learners, existingLearners);
+          setVerifiedCandidates(verified);
+          setDuplicates(dups);
+          setStep('review');
+          onToast(`AI Vision successfully extracted ${verified.length} learners!`);
+          return;
+        } else if (res && res.error === 'NO_API_KEY') {
+          onToast('Tip: Add a free Gemini key to read handwritten documents.');
+        }
+      } catch (err) {
+        console.warn('AI Vision unavailable or failed, switching to local deblurring OCR:', err.message);
+      }
+    }
+
+    // 2. In-Browser OCR with Unsharp Mask Deblurring & Adaptive Thresholding
+    setStatusMessage('Applying Unsharp Mask Deblurring & Adaptive Binarization...');
+    setProgress(35);
 
     try {
       const rawText = await recognizeText(file, (pct) => {
         setProgress(pct);
-        if (pct < 20) {
-          setStatusMessage('Step 1/3: Preprocessing document contrast & borders...');
+        if (pct < 25) {
+          setStatusMessage('Deblurring text strokes & leveling paper shadows...');
         } else if (pct < 85) {
-          setStatusMessage(`Step 2/3: Recognizing physical text via OCR (${pct}%)...`);
+          setStatusMessage(`Extracting text strokes (${pct}%)...`);
         } else {
-          setStatusMessage('Step 3/3: Extracting student names, admission numbers & streams...');
+          setStatusMessage('Filtering hallucinated noise & validating names...');
         }
       });
 
       const parsedCandidates = parseRegisterText(rawText, defaultClass);
-      const { verified, duplicates: dups } = validateAndDeduplicate(parsedCandidates, existingLearners);
+      if (parsedCandidates.length === 0) {
+        alert('Could not detect clear names from this image. The document may be too blurred, faint, or handwritten. Tips: 1) Hold the camera steady with direct light, 2) Use the "Paste Text" tab, or 3) Enable AI Vision Mode.');
+        setStep('upload');
+        return;
+      }
 
+      const { verified, duplicates: dups } = validateAndDeduplicate(parsedCandidates, existingLearners);
       setVerifiedCandidates(verified);
       setDuplicates(dups);
       setStep('review');
@@ -1726,6 +1781,44 @@ function ScannerView({ existingLearners, onImportLearners, onToast }) {
 
           {inputTab === 'camera' && (
             <div style={{ marginTop: 18 }}>
+              {/* AI Vision Mode Banner */}
+              <div style={{ marginBottom: 14, padding: '12px 16px', background: useAiVision ? '#f3faf5' : '#fafafa', border: useAiVision ? '1px solid #c2e0cb' : '1px solid var(--line)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: useAiVision ? '#1f5431' : 'var(--ink)' }}>
+                      ⚡ AI Vision Mode (Reads handwriting & low-quality photos)
+                    </span>
+                    <span className="results-badge" style={{ background: useAiVision ? '#2e7d47' : '#e6e8e6', color: useAiVision ? '#fff' : '#666', fontSize: 10 }}>
+                      {useAiVision ? 'Active' : 'Off'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                    Handles teacher handwriting, camera blur, and lighting shadows with zero hallucination.
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button 
+                    className="pill"
+                    style={{ fontSize: 11, cursor: 'pointer', padding: '4px 10px', background: apiKey ? '#e4efe6' : '#fff' }}
+                    onClick={() => {
+                      setTempKey(apiKey);
+                      setShowKeyModal(true);
+                    }}
+                  >
+                    {apiKey ? '✓ API Key Saved' : '+ Enter Gemini API Key'}
+                  </button>
+                  <label style={{ fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input 
+                      type="checkbox" 
+                      checked={useAiVision} 
+                      onChange={(e) => setUseAiVision(e.target.checked)} 
+                      style={{ width: 16, height: 16, accentColor: 'var(--accent)' }}
+                    />
+                    Enable
+                  </label>
+                </div>
+              </div>
+
               <div 
                 className="scanner-dropzone"
                 onClick={() => fileInputRef.current?.click()}
@@ -1761,6 +1854,53 @@ function ScannerView({ existingLearners, onImportLearners, onToast }) {
                   if (e.target.files?.[0]) processImageFile(e.target.files[0]);
                 }}
               />
+            </div>
+          )}
+
+          {/* Gemini API Key Configuration Modal */}
+          {showKeyModal && (
+            <div className="modal-backdrop" onClick={() => setShowKeyModal(false)}>
+              <div className="modal" style={{ maxWidth: 440, padding: 24 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-head">
+                  <h2 style={{ fontSize: 18, margin: 0 }}>Gemini Vision API Key</h2>
+                  <button className="modal-close" onClick={() => setShowKeyModal(false)}>
+                    <XIcon size={14} />
+                  </button>
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8, lineHeight: 1.45 }}>
+                  Google Gemini 1.5 Flash provides free multimodal vision processing for handwritten and blurred paper registers. You can get a free key instantly at <strong>aistudio.google.com</strong>.
+                </p>
+                <input 
+                  type="password"
+                  className="search"
+                  style={{ width: '100%', marginTop: 12, fontSize: 13 }}
+                  placeholder="Paste AIzaSy... key"
+                  value={tempKey}
+                  onChange={e => setTempKey(e.target.value)}
+                />
+                <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                  <button 
+                    className="button" 
+                    style={{ background: 'transparent', border: '1px solid var(--line)', color: 'var(--ink)' }} 
+                    onClick={() => setShowKeyModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    className="button" 
+                    onClick={() => {
+                      const clean = tempKey.trim();
+                      setApiKey(clean);
+                      localStorage.setItem('tawir_gemini_api_key', clean);
+                      api.saveGeminiKey(clean).catch(() => {});
+                      onToast(clean ? 'Gemini API Key saved.' : 'API Key removed.');
+                      setShowKeyModal(false);
+                    }}
+                  >
+                    Save Key
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

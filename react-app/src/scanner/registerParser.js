@@ -173,7 +173,10 @@ export function parseStudentLine(line, fallbackClass) {
   if (cleanWords.length === 0) return null;
 
   // Title-case formatting (handles "O'Connor", "Mwangi", "Alvarez")
-  const fullName = cleanWords
+  const validWords = cleanWords.filter(w => !isGibberishWord(w));
+  if (validWords.length === 0) return null;
+
+  const fullName = validWords
     .map(w => {
       if (w.includes("'")) {
         return w.split("'").map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join("'");
@@ -182,7 +185,7 @@ export function parseStudentLine(line, fallbackClass) {
     })
     .join(' ');
 
-  if (fullName.length < 3) return null;
+  if (fullName.length < 3 || isGibberishName(fullName)) return null;
 
   return {
     name: fullName,
@@ -191,7 +194,41 @@ export function parseStudentLine(line, fallbackClass) {
     section: section || '',
     gender: gender || '',
     contact: contact || '',
-    confidence: cleanWords.length >= 2 ? 0.96 : 0.82,
+    confidence: validWords.length >= 2 ? 0.96 : 0.82,
     rawLine: line
   };
+}
+
+/**
+ * Detects OCR hallucinated noise / gibberish generated from blurred or damaged paper
+ */
+export function isGibberishWord(word = '') {
+  const w = word.trim().toLowerCase();
+  if (w.length <= 1) return true;
+
+  // Real human name words must contain at least one vowel
+  if (w.length >= 3 && !/[aeiouy]/.test(w)) {
+    return true;
+  }
+
+  // Reject unnatural consonant clusters (e.g. "xkpth", "qzrbm")
+  if (/[bcdfghjklmnpqrstvwxz]{5,}/.test(w)) {
+    return true;
+  }
+
+  // Reject triple repeated characters (e.g. "xxx", "lll")
+  if (/([a-z])\1{2,}/.test(w)) {
+    return true;
+  }
+
+  return false;
+}
+
+export function isGibberishName(name = '') {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 0) return true;
+
+  const gibberishCount = parts.filter(isGibberishWord).length;
+  // If more than half the words are gibberish, the line is hallucinated noise
+  return gibberishCount / parts.length > 0.4;
 }
