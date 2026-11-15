@@ -10,7 +10,7 @@ import { CameraIcon, FileTextIcon, AlertTriangleIcon, TrashIcon } from '../Icons
 
 export default function ScannerView({ existingLearners, onImportLearners, onToast }) {
   const [step, setStep] = useState('upload'); // 'upload' | 'adjust' | 'processing' | 'review'
-  const [inputTab, setInputTab] = useState('camera'); // 'camera' | 'paste'
+  const [showPasteText, setShowPasteText] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
   const [defaultClass, setDefaultClass] = useState('Grade 3 Blue');
@@ -202,27 +202,8 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
       </div>
 
       {step === 'upload' && (
-        <div className="panel" style={{ maxWidth: 720 }}>
-          <div style={{ display: 'flex', gap: 10, borderBottom: '1px solid var(--line)', paddingBottom: 14 }}>
-            <button
-              className={`pill ${inputTab === 'camera' ? 'active' : ''}`}
-              onClick={() => setInputTab('camera')}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
-            >
-              <CameraIcon size={14} />
-              <span>Camera / Photo Upload</span>
-            </button>
-            <button
-              className={`pill ${inputTab === 'paste' ? 'active' : ''}`}
-              onClick={() => setInputTab('paste')}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
-            >
-              <FileTextIcon size={14} />
-              <span>Paste Text / WhatsApp List</span>
-            </button>
-          </div>
-
-          <div style={{ marginTop: 18 }}>
+        <div className="panel" style={{ maxWidth: 540, padding: '24px 24px 20px' }}>
+          <div style={{ marginBottom: 16 }}>
             <label style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>Target Class / Grade:</label>
             <input
               type="text"
@@ -234,60 +215,82 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
             />
           </div>
 
-          {inputTab === 'camera' && (
-            <div style={{ marginTop: 18 }}>
+          {!showPasteText ? (
+            <div>
               <div 
                 className="scanner-dropzone"
                 onClick={() => fileInputRef.current?.click()}
+                style={{ padding: '26px 18px', cursor: 'pointer' }}
               >
-                <div className="scanner-dropzone-icon">
-                  <CameraIcon size={36} />
+                <div className="scanner-dropzone-icon" style={{ width: 48, height: 48 }}>
+                  <FileTextIcon size={24} />
                 </div>
-                <div style={{ fontWeight: 800, fontSize: 16, marginTop: 8 }}>
-                  Take Photo or Upload Register Image
+                <div style={{ fontWeight: 700, fontSize: 15, marginTop: 10 }}>
+                  Choose Document
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                  Supports camera snapshots, PNG, JPG, or scans of paper attendance sheets
+                  Select register photo or document from your device files
                 </div>
-                <button 
-                  className="button"
-                  style={{ marginTop: 14 }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    fileInputRef.current?.click();
-                  }}
-                >
-                  Choose Document Image
-                </button>
               </div>
 
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
-                capture="environment"
                 style={{ display: 'none' }}
                 onChange={(e) => {
                   if (e.target.files?.[0]) handleSelectImageFile(e.target.files[0]);
                 }}
               />
-            </div>
-          )}
 
-          {inputTab === 'paste' && (
-            <div style={{ marginTop: 18 }}>
-              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>
-                Paste Roster, WhatsApp message, Excel, or Word text:
-              </label>
+              <div style={{ marginTop: 14, textAlign: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowPasteText(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--muted)',
+                    fontSize: 12,
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    padding: '4px 8px',
+                  }}
+                >
+                  Or paste roster text / WhatsApp message
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>
+                  Paste student names or roster text:
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowPasteText(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--accent)',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
+                >
+                  Back to document files
+                </button>
+              </div>
               <textarea
                 className="search"
                 rows={8}
-                style={{ width: '100%', marginTop: 6, fontFamily: 'monospace', fontSize: 13, resize: 'vertical' }}
+                style={{ width: '100%', fontFamily: 'monospace', fontSize: 13, resize: 'vertical' }}
                 placeholder={`1. 3021 Brian Mwangi (M)\n2. STU-2026002 Olivia Anderson Sec C\n3. Noah Perez Adm 3023\n4. 3024 Emma Lewis`}
                 value={pastedText}
                 onChange={(e) => setPastedText(e.target.value)}
               />
-              <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                 <button 
                   className="button"
                   onClick={processPastedText}
