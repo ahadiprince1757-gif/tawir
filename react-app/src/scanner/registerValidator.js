@@ -1,8 +1,10 @@
 /**
- * Register Validator & Deduplication
+ * REGISTER VALIDATOR & DEDUPLICATION ENGINE
  * 
- * Verifies candidate learners from scanner, flags duplicates,
- * and prepares them for Human Confirmation.
+ * Cross-checks scanned candidate records against the existing school database:
+ * - Prevents duplicate student entries
+ * - Performs fuzzy matching to suggest corrections without silently overriding
+ * - Preserves status: 'verified' vs 'needs_review' with clear explanation notes
  */
 
 import { normalizeName, similarity } from '../core/learners/learnerMatcher.js';
@@ -16,7 +18,7 @@ export function validateAndDeduplicate(candidates = [], existingLearners = []) {
     const key = `${normalizeName(l.fullName)}::${normalizeName(l.className)}`;
     existingMap.set(key, l);
     if (l.admissionNumber) {
-      existingMap.set(`adm::${l.admissionNumber}`, l);
+      existingMap.set(`adm::${String(l.admissionNumber).trim()}`, l);
     }
   }
 
@@ -28,44 +30,60 @@ export function validateAndDeduplicate(candidates = [], existingLearners = []) {
     const clsNorm = normalizeName(cand.className);
     const key = `${norm}::${clsNorm}`;
 
-    // Already in this scan batch?
+    // 1. Check duplicate within current scan sheet
     if (seenInBatch.has(key)) {
       duplicates.push({
         candidate: cand,
-        reason: 'Duplicate in scanned document',
+        reason: 'Duplicate entry on same scan page',
       });
       continue;
     }
     seenInBatch.add(key);
 
-    // Already exists in school database?
-    let matchedExisting = null;
-    if (cand.admissionNumber && existingMap.has(`adm::${cand.admissionNumber}`)) {
-      matchedExisting = existingMap.get(`adm::${cand.admissionNumber}`);
+    // 2. Exact match in existing school database
+    let exactExisting = null;
+    if (cand.admissionNumber && existingMap.has(`adm::${String(cand.admissionNumber).trim()}`)) {
+      exactExisting = existingMap.get(`adm::${String(cand.admissionNumber).trim()}`);
     } else if (existingMap.has(key)) {
-      matchedExisting = existingMap.get(key);
-    } else {
-      // Fuzzy check against existing database
-      for (const ex of existingLearners) {
-        if (normalizeName(ex.className) === clsNorm && similarity(norm, normalizeName(ex.fullName)) > 0.9) {
-          matchedExisting = ex;
-          break;
-        }
+      exactExisting = existingMap.get(key);
+    }
+
+    if (exactExisting) {
+      duplicates.push({
+        candidate: cand,
+        existing: exactExisting,
+        reason: `Already enrolled as ${exactExisting.fullName} (${exactExisting.className})`,
+      });
+      continue;
+    }
+
+    // 3. Fuzzy match: Check for slight optical character confusion against existing students
+    // e.g. OCR read "J0hn Kamau" when database has "John Kamau"
+    let suggestedMatch = null;
+    for (const ex of existingLearners) {
+      const sim = similarity(norm, normalizeName(ex.fullName));
+      if (sim >= 0.78 && sim < 0.99) {
+        suggestedMatch = ex;
+        break;
       }
     }
 
-    if (matchedExisting) {
-      duplicates.push({
-        candidate: cand,
-        existing: matchedExisting,
-        reason: `Already enrolled as ${matchedExisting.fullName} (${matchedExisting.className})`,
-      });
-    } else {
-      verified.push({
-        ...cand,
-        keep: true,
-      });
+    let itemStatus = cand.status || 'verified';
+    let reviewReason = cand.reviewReason || '';
+
+    if (suggestedMatch) {
+      itemStatus = 'needs_review';
+      const suggestionNote = `Did you mean enrolled student "${suggestedMatch.fullName}"?`;
+      reviewReason = reviewReason ? `${reviewReason} • ${suggestionNote}` : suggestionNote;
     }
+
+    verified.push({
+      ...cand,
+      status: itemStatus,
+      reviewReason,
+      suggestedMatch: suggestedMatch ? suggestedMatch.fullName : null,
+      keep: true,
+    });
   }
 
   return {

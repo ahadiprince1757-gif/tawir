@@ -1,22 +1,42 @@
 /**
- * PURE DETERMINISTIC REGISTER PARSER & ANTI-HALLUCINATION ENGINE
+ * PURE DETERMINISTIC REGISTER PARSER & MULTI-SIGNAL GRAMMAR ENGINE
  * 
- * Extracts real students from physical handwritten and printed school registers:
- * - Parses columns: Index / Admission No / Full Name / Gender / Section / Attendance
+ * Extracts real student records from physical school attendance registers:
+ * - Parses columns: Row Index / Admission No / Full Name / Gender / Section / Attendance
  * - Strips table grid dividers (|) and misrecognized border characters (l, I, !)
  * - Strips attendance grids (P/A, 1/0, ticks, dots, percentages)
  * - Converts "LAST, FIRST" format to natural "First Last"
  * - Formats proper title casing (including O'Connor, Mwangi, etc.)
- * - STRICT ANTI-HALLUCINATION: Discards smudges, paper noise, administrative headers, and non-name clusters
+ * - NEVER SILENTLY DROPS STUDENTS: Faint/low-confidence names are marked with
+ *   status: 'needs_review' rather than being deleted!
+ * - Filters out document headers, totals, signatures, and pure noise
  */
 
-export function parseRegisterText(rawText = '', defaultClass = '') {
-  if (!rawText) return [];
+import { evaluateCandidateConfidence } from './confidenceEngine.js';
 
-  const lines = rawText
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 1);
+export function parseRegisterText(input, defaultClass = '') {
+  if (!input) return [];
+
+  // Support both raw string or structured OCR line objects: [{ text, confidence, bbox }]
+  let lineEntries = [];
+  if (typeof input === 'string') {
+    lineEntries = input
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 1)
+      .map((l) => ({ text: l, confidence: 80 }));
+  } else if (Array.isArray(input)) {
+    lineEntries = input
+      .map((item) => {
+        if (typeof item === 'string') return { text: item.trim(), confidence: 80 };
+        return {
+          text: (item.text || '').trim(),
+          confidence: typeof item.confidence === 'number' ? item.confidence : 80,
+          bbox: item.bbox || null,
+        };
+      })
+      .filter((item) => item.text.length > 1);
+  }
 
   const candidates = [];
   let currentClassContext = defaultClass.trim() || 'General';
@@ -24,7 +44,9 @@ export function parseRegisterText(rawText = '', defaultClass = '') {
   // Header detection regex (e.g. "CLASS: GRADE 3 BLUE", "PP2 ATTENDANCE REGISTER", "Grade 4 East")
   const classHeaderRegex = /\b(?:class|grade|stream|room|form)\s*[:\-]?\s*([a-z0-9\s]+)\b/i;
 
-  for (const line of lines) {
+  for (const entry of lineEntries) {
+    const { text: line, confidence: rawOcrConf } = entry;
+
     // 1. Check if line sets a new class context
     const headerMatch = line.match(classHeaderRegex);
     if (headerMatch && headerMatch[1].trim().length > 1 && headerMatch[1].trim().length < 25) {
@@ -38,7 +60,7 @@ export function parseRegisterText(rawText = '', defaultClass = '') {
     }
 
     // 3. Parse candidate student row
-    const parsed = parseStudentLine(line, currentClassContext);
+    const parsed = parseStudentLine(line, currentClassContext, rawOcrConf);
     if (parsed) {
       candidates.push(parsed);
     }
@@ -56,7 +78,7 @@ function cleanClassName(str) {
     .join(' ');
 }
 
-function isSystemHeaderLine(line) {
+export function isSystemHeaderLine(line) {
   const lower = line.toLowerCase();
   
   // Table headers & administrative terms
@@ -86,7 +108,7 @@ function isSystemHeaderLine(line) {
     if (headerWordCount >= 2) return true;
   }
 
-  // Lines with signature dots/dashes e.g. "Signature: ...................."
+  // Signature dots/dashes e.g. "Signature: ...................."
   if (/[._\-]{5,}/.test(line)) {
     return true;
   }
@@ -99,7 +121,7 @@ function isSystemHeaderLine(line) {
   return false;
 }
 
-export function parseStudentLine(line, fallbackClass) {
+export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
   let text = line.trim();
 
   // Strip table delimiters: "|", "+", "---"
@@ -190,21 +212,31 @@ export function parseStudentLine(line, fallbackClass) {
   const cleanWords = nameWords.filter((w) => !nonNameKeywords.has(w.toLowerCase()));
   if (cleanWords.length === 0) return null;
 
-  // Title-case formatting and strict phonetic gibberish rejection
-  const validWords = cleanWords.filter((w) => !isGibberishWord(w));
-  if (validWords.length === 0) return null;
+  // Title-case formatting
+  const formattedWords = cleanWords.map((w) => {
+    if (w.includes("'")) {
+      return w.split("'").map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join("'");
+    }
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  });
 
-  const fullName = validWords
-    .map((w) => {
-      if (w.includes("'")) {
-        return w.split("'").map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join("'");
-      }
-      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
-    })
-    .join(' ');
+  const fullName = formattedWords.join(' ');
+  if (fullName.length < 2) return null;
 
-  // Reject single-letter remnants or gibberish names
-  if (fullName.length < 3 || isGibberishName(fullName)) return null;
+  // Multi-signal evaluation
+  const confidenceEval = evaluateCandidateConfidence({
+    ocrConfidence,
+    name: fullName,
+    admissionNumber,
+    gender,
+    section,
+    isHeader: false,
+  });
+
+  // If purely non-name noise, discard
+  if (confidenceEval.status === 'noise') {
+    return null;
+  }
 
   return {
     name: fullName,
@@ -213,8 +245,11 @@ export function parseStudentLine(line, fallbackClass) {
     section: section || '',
     gender: gender || '',
     contact: contact || '',
-    confidence: validWords.length >= 2 ? 0.96 : 0.82,
-    rawLine: line
+    status: confidenceEval.status, // 'verified' | 'needs_review'
+    reviewReason: confidenceEval.reviewReason,
+    compositeConfidence: confidenceEval.compositeScore,
+    signals: confidenceEval.signals,
+    rawLine: line,
   };
 }
 

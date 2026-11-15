@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { createLearner } from '../core/database/schema.js';
-import { recognizeText } from '../scanner/scanner.js';
+import { recognizeText, processScannedDocument } from '../scanner/scanner.js';
 import { parseRegisterText } from '../scanner/registerParser.js';
 import { validateAndDeduplicate } from '../scanner/registerValidator.js';
 import { CameraIcon, FileTextIcon, AlertTriangleIcon, TrashIcon } from '../Icons.jsx';
@@ -23,28 +23,34 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
     setPreviewUrl(URL.createObjectURL(file));
     setStep('processing');
     setProgress(10);
-    setStatusMessage('Deblurring strokes & leveling shadows...');
+    setStatusMessage('Scanning register...');
 
     try {
-      const rawText = await recognizeText(file, (pct) => {
+      const ocrResult = await recognizeText(file, (pct) => {
         setProgress(pct);
-        if (pct < 25) {
-          setStatusMessage('Deblurring text strokes & leveling paper shadows...');
+        if (pct < 30) {
+          setStatusMessage('Processing image...');
         } else if (pct < 85) {
-          setStatusMessage(`Scanning register lines (${pct}%)...`);
+          setStatusMessage(`Reading text (${pct}%)...`);
         } else {
-          setStatusMessage('Filtering noise & validating real student names...');
+          setStatusMessage('Extracting records...');
         }
       });
 
-      const parsedCandidates = parseRegisterText(rawText, defaultClass);
-      if (parsedCandidates.length === 0) {
-        alert('Could not detect clear student names from this image. The document may be too blurred or faint. Tips: 1) Hold camera steady under direct lighting, or 2) Use the "Paste Text" tab.');
+      const { verified, duplicates: dups } = processScannedDocument(
+        ocrResult,
+        defaultClass,
+        existingLearners
+      );
+
+      if (verified.length === 0 && dups.length === 0) {
+        alert(
+          'Could not detect student records from this image. Please ensure the paper is well-lit and legible, or use the "Paste Text" tab.'
+        );
         setStep('upload');
         return;
       }
 
-      const { verified, duplicates: dups } = validateAndDeduplicate(parsedCandidates, existingLearners);
       setVerifiedCandidates(verified);
       setDuplicates(dups);
       setStep('review');
@@ -99,7 +105,7 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
       className: defaultClass || 'General',
       section: '',
       gender: '',
-      keep: true
+      keep: true,
     };
     setVerifiedCandidates((prev) => [newCand, ...prev]);
   };
@@ -138,10 +144,10 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
     <section className="view active">
       <div className="page-head">
         <div>
-          <div className="eyebrow">Smart Document Digitization</div>
+          <div className="eyebrow">Document Scanner</div>
           <h1>Register Scanner</h1>
           <div className="sub">
-            Capture paper attendance sheets, handwritten registers, or paste student lists. Automatic contrast leveling, admission extraction, and duplicate detection.
+            Capture paper attendance sheets, handwritten registers, or paste student lists.
           </div>
         </div>
       </div>
@@ -261,10 +267,10 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
             <div className="progress-fill" style={{ width: `${progress}%`, transition: 'width 0.25s ease' }} />
           </div>
           <div style={{ fontWeight: 700, fontSize: 16, marginTop: 14 }}>
-            {statusMessage || 'Processing physical register...'}
+            {statusMessage || 'Processing register...'}
           </div>
           <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-            Neural OCR engine reading physical document • {progress}%
+            Reading document • {progress}%
           </div>
         </div>
       )}
@@ -274,7 +280,7 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <h2 style={{ margin: 0, fontSize: 18 }}>Review & Confirm Candidates</h2>
+                <h2 style={{ margin: 0, fontSize: 18 }}>Review Scanned Records</h2>
                 <span className="results-badge" style={{ background: '#eef5f0', color: 'var(--accent)' }}>
                   {keptCount} of {verifiedCandidates.length} Selected
                 </span>
@@ -335,7 +341,10 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
               <tbody>
                 {verifiedCandidates.length > 0 ? (
                   verifiedCandidates.map((cand, idx) => (
-                    <tr key={idx} className={`sheet-row ${cand.keep ? '' : 'scanner-row-discarded'}`}>
+                    <tr
+                      key={idx}
+                      className={`sheet-row ${cand.keep ? '' : 'scanner-row-discarded'}`}
+                    >
                       <td style={{ textAlign: 'center' }}>
                         <input
                           type="checkbox"
