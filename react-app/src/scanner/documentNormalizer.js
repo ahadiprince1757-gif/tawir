@@ -112,14 +112,18 @@ export async function normalizeDocument(imageInput) {
       img.src = imageInput;
     } else if (imageInput instanceof Blob || imageInput instanceof File) {
       img.src = URL.createObjectURL(imageInput);
-    } else if (imageInput instanceof HTMLCanvasElement) {
-      resolve({
-        canvas: imageInput,
-        width: imageInput.width,
-        height: imageInput.height,
-        gray: null,
-        skewAngle: 0,
-      });
+    } else if (typeof HTMLCanvasElement !== 'undefined' && imageInput instanceof HTMLCanvasElement) {
+      try {
+        img.src = imageInput.toDataURL('image/jpeg', 0.95);
+      } catch (e) {
+        resolve({
+          canvas: imageInput,
+          width: imageInput.width,
+          height: imageInput.height,
+          gray: null,
+          skewAngle: 0,
+        });
+      }
     } else {
       resolve({ canvas: imageInput, width: 1800, height: 1200, gray: null, skewAngle: 0 });
     }

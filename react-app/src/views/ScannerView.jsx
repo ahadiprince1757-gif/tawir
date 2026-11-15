@@ -3,40 +3,84 @@ import { createLearner } from '../core/database/schema.js';
 import { recognizeText, processScannedDocument } from '../scanner/scanner.js';
 import { parseRegisterText } from '../scanner/registerParser.js';
 import { validateAndDeduplicate } from '../scanner/registerValidator.js';
+import DocumentCornerAdjuster, { getDefaultCorners } from '../scanner/components/DocumentCornerAdjuster.jsx';
+import { correctDocumentPerspective } from '../scanner/documentPerspectiveCorrector.js';
+import { DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS } from '../scanner/detection/documentTypeDetector.js';
 import { CameraIcon, FileTextIcon, AlertTriangleIcon, TrashIcon } from '../Icons.jsx';
 
 export default function ScannerView({ existingLearners, onImportLearners, onToast }) {
-  const [step, setStep] = useState('upload'); // 'upload' | 'processing' | 'review'
+  const [step, setStep] = useState('upload'); // 'upload' | 'adjust' | 'processing' | 'review'
   const [inputTab, setInputTab] = useState('camera'); // 'camera' | 'paste'
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
   const [defaultClass, setDefaultClass] = useState('Grade 3 Blue');
   const [pastedText, setPastedText] = useState('');
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [sourceImage, setSourceImage] = useState(null); // { url, width, height, canvas, file }
+  const [corners, setCorners] = useState([]);
+  const [classification, setClassification] = useState(null);
+  const [documentRecord, setDocumentRecord] = useState(null);
   const [verifiedCandidates, setVerifiedCandidates] = useState([]);
   const [duplicates, setDuplicates] = useState([]);
 
   const fileInputRef = useRef(null);
 
-  const processImageFile = async (file) => {
+  const handleSelectImageFile = (file) => {
     if (!file) return;
-    setPreviewUrl(URL.createObjectURL(file));
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+
+      const initialCorners = getDefaultCorners(img.width, img.height);
+      setSourceImage({
+        url,
+        width: img.width,
+        height: img.height,
+        canvas,
+        file,
+      });
+      setCorners(initialCorners);
+      setPreviewUrl(url);
+      setStep('adjust');
+    };
+    img.src = url;
+  };
+
+  const handleConfirmBoundaries = async (confirmedCorners) => {
+    if (!sourceImage?.canvas) return;
+    setCorners(confirmedCorners);
     setStep('processing');
-    setProgress(10);
-    setStatusMessage('Scanning register...');
+    setProgress(15);
+    setStatusMessage('Correcting document perspective...');
 
     try {
-      const ocrResult = await recognizeText(file, (pct) => {
+      // Step 1: Perspective homography correction to rectify skewed camera shot into crisp flat sheet
+      const rectified = await correctDocumentPerspective(sourceImage.canvas, confirmedCorners);
+      setProgress(25);
+      setStatusMessage('Enhancing contrast & deblurring strokes...');
+
+      // Step 2: OCR & Layout Recognition on the rectified document
+      const ocrResult = await recognizeText(rectified.canvas, (pct) => {
         setProgress(pct);
-        if (pct < 30) {
-          setStatusMessage('Processing image...');
+        if (pct < 35) {
+          setStatusMessage('Enhancing stroke contrast...');
         } else if (pct < 85) {
           setStatusMessage(`Reading text (${pct}%)...`);
         } else {
-          setStatusMessage('Extracting records...');
+          setStatusMessage('Classifying document & extracting records...');
         }
       });
 
+      setClassification(ocrResult.classification);
+      setDocumentRecord(ocrResult.record);
+
+      // Step 3: Parse candidates
       const { verified, duplicates: dups } = processScannedDocument(
         ocrResult,
         defaultClass,
@@ -45,18 +89,16 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
 
       if (verified.length === 0 && dups.length === 0) {
         alert(
-          'Could not detect student records from this image. Please ensure the paper is well-lit and legible, or use the "Paste Text" tab.'
+          'Could not extract structured records from this document. You can adjust the document boundary corners or enter records directly.'
         );
-        setStep('upload');
-        return;
       }
 
       setVerifiedCandidates(verified);
       setDuplicates(dups);
       setStep('review');
     } catch (err) {
-      alert('Scanner error: ' + err.message);
-      setStep('upload');
+      alert('Scanner processing error: ' + err.message);
+      setStep('adjust');
     }
   };
 
@@ -73,6 +115,12 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
     }
 
     const { verified, duplicates: dups } = validateAndDeduplicate(parsedCandidates, existingLearners);
+    setClassification({
+      type: DOCUMENT_TYPES.CLASS_LIST,
+      label: DOCUMENT_TYPE_LABELS[DOCUMENT_TYPES.CLASS_LIST],
+      confidence: 0.9,
+      status: 'probable_match',
+    });
     setVerifiedCandidates(verified);
     setDuplicates(dups);
     setStep('review');
@@ -133,6 +181,7 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
     onToast(`Successfully saved ${toImport.length} learners to directory!`);
     setStep('upload');
     setPreviewUrl(null);
+    setSourceImage(null);
     setPastedText('');
     setVerifiedCandidates([]);
     setDuplicates([]);
@@ -219,7 +268,7 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
                 capture="environment"
                 style={{ display: 'none' }}
                 onChange={(e) => {
-                  if (e.target.files?.[0]) processImageFile(e.target.files[0]);
+                  if (e.target.files?.[0]) handleSelectImageFile(e.target.files[0]);
                 }}
               />
             </div>
@@ -252,6 +301,23 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
         </div>
       )}
 
+      {step === 'adjust' && sourceImage && (
+        <div className="panel" style={{ maxWidth: 860, padding: 20 }}>
+          <DocumentCornerAdjuster
+            imageUrl={sourceImage.url}
+            imageWidth={sourceImage.width}
+            imageHeight={sourceImage.height}
+            initialCorners={corners}
+            onConfirm={handleConfirmBoundaries}
+            onCancel={() => {
+              setStep('upload');
+              setSourceImage(null);
+              setPreviewUrl(null);
+            }}
+          />
+        </div>
+      )}
+
       {step === 'processing' && (
         <div className="panel" style={{ maxWidth: 640, textAlign: 'center', padding: '36px 24px' }}>
           {previewUrl && (
@@ -279,11 +345,26 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
         <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <h2 style={{ margin: 0, fontSize: 18 }}>Review Scanned Records</h2>
                 <span className="results-badge" style={{ background: '#eef5f0', color: 'var(--accent)' }}>
                   {keptCount} of {verifiedCandidates.length} Selected
                 </span>
+                {classification && (
+                  <span
+                    className="results-badge"
+                    style={{
+                      background: classification.confidence >= 0.7 ? '#e8f5e9' : '#fff8e1',
+                      color: classification.confidence >= 0.7 ? '#2e7d32' : '#b78103',
+                      border: '1px solid var(--line)',
+                      fontWeight: 600,
+                    }}
+                    title={classification.status === 'probable_match' ? 'High-confidence classification match' : 'Classification review recommended'}
+                  >
+                    {classification.label || 'Document'}
+                    {classification.confidence > 0 ? ` (${Math.round(classification.confidence * 100)}%)` : ''}
+                  </span>
+                )}
               </div>
               <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>
                 Spreadsheet review: Every cell is directly editable. Uncheck any row you wish to exclude.
@@ -291,6 +372,16 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
             </div>
 
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              {sourceImage && (
+                <button
+                  className="pill"
+                  onClick={() => setStep('adjust')}
+                  style={{ cursor: 'pointer', fontSize: 12 }}
+                  title="Return to boundary corner adjustment"
+                >
+                  Adjust Boundaries
+                </button>
+              )}
               <button 
                 className="pill" 
                 onClick={() => handleSelectAll(true)}
@@ -434,6 +525,7 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
               onClick={() => {
                 setStep('upload');
                 setPreviewUrl(null);
+                setSourceImage(null);
               }}
             >
               Cancel / Rescan

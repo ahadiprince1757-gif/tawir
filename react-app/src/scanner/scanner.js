@@ -3,11 +3,15 @@ import { normalizeDocument } from './documentNormalizer.js';
 import { detectRegisterLayout } from './layoutDetector.js';
 import { parseRegisterText } from './registerParser.js';
 import { validateAndDeduplicate } from './registerValidator.js';
+import { detectDocumentType, DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS } from './detection/documentTypeDetector.js';
+import { createDocumentRecord } from './core/documentRecord.js';
 
 export { normalizeDocument } from './documentNormalizer.js';
 export { detectRegisterLayout } from './layoutDetector.js';
 export { parseRegisterText } from './registerParser.js';
 export { validateAndDeduplicate } from './registerValidator.js';
+export { detectDocumentType, DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS } from './detection/documentTypeDetector.js';
+export { createDocumentRecord } from './core/documentRecord.js';
 
 /**
  * PURE IN-BROWSER REGISTER SCANNER ENGINE
@@ -78,11 +82,31 @@ export async function recognizeText(image, onProgress) {
 
     if (onProgress) onProgress(100);
 
+    const rawText = data.text || '';
+    const classification = detectDocumentType(rawText);
+
+    const record = createDocumentRecord({
+      originalFile: (image && image.name) ? image : null,
+      correctedCanvas: canvas instanceof HTMLCanvasElement ? canvas : null,
+      classification,
+      quality: {
+        quality: classification.confidence >= 0.65 ? 'acceptable' : 'needs_review',
+        metrics: {
+          skewAngle: normResult.skewAngle || 0,
+          linesDetected: structuredLines.length,
+          confidence: data.confidence || 0,
+        },
+        issues: classification.status === 'needs_review' ? ['Uncertain document classification — review recommended'] : [],
+      },
+    });
+
     return {
       structuredLines,
-      rawText: data.text || '',
+      rawText,
       layout,
       skewAngle: normResult.skewAngle || 0,
+      classification,
+      record,
     };
   } finally {
     await worker.terminate();
@@ -95,5 +119,12 @@ export async function recognizeText(image, onProgress) {
 export function processScannedDocument(ocrResult, defaultClass = '', existingLearners = []) {
   const linesToParse = ocrResult?.structuredLines || ocrResult?.rawText || ocrResult;
   const candidates = parseRegisterText(linesToParse, defaultClass);
-  return validateAndDeduplicate(candidates, existingLearners);
+  const { verified, duplicates } = validateAndDeduplicate(candidates, existingLearners);
+
+  return {
+    verified,
+    duplicates,
+    classification: ocrResult?.classification || null,
+    record: ocrResult?.record || null,
+  };
 }
