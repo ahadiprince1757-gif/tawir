@@ -41,8 +41,8 @@ export function evaluateCandidateConfidence({
   let nameSignal = 0;
   let nameReviewNotes = [];
 
-  if (nameParts.length >= 2) {
-    // Standard full name (First + Last)
+  if (nameParts.length >= 2 && nameParts.length <= 3) {
+    // Standard full name (First + Last or First + Middle + Last)
     let validWordCount = 0;
     for (const w of nameParts) {
       if (w.length >= 2 && /[aeiouy]/i.test(w) && !/[^a-zA-Z'\-]/i.test(w)) {
@@ -61,8 +61,8 @@ export function evaluateCandidateConfidence({
       nameReviewNotes.push('Single name only — confirm if surname is missing');
     }
   } else {
-    nameSignal = 0.2;
-    nameReviewNotes.push('Name incomplete or too short');
+    nameSignal = 0;
+    nameReviewNotes.push('Sentence or phrase detected instead of student name');
   }
 
   // 3. Admission Number Validity signal (0 to 1)

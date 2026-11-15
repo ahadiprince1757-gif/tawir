@@ -52,7 +52,7 @@ export async function recognizeText(image, onProgress) {
 
   try {
     await worker.setParameters({
-      tessedit_pageseg_mode: '6', // PSM 6: Single uniform block (preserves row order in registers)
+      tessedit_pageseg_mode: '3', // PSM 3: Fully automatic page segmentation (discovers table columns & lines naturally)
       preserve_interword_spaces: '1',
     });
 

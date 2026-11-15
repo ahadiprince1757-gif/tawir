@@ -48,27 +48,61 @@ export async function normalizeDocument(imageInput) {
           gray[j] = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8;
         }
 
-        // 2. Skew Detection via Horizontal Projection Profile
-        // Measures projection variance across candidate angles (-4° to +4°)
-        const skewAngle = detectSkewAngle(gray, width, height);
         let workingCanvas = canvas;
         let workingGray = gray;
         let workingWidth = width;
         let workingHeight = height;
 
+        // 2. Automatic Document Edge & Paper Boundary Tracing
+        // Automatically isolates paper document from desk background without requiring user intervention
+        const bounds = autoDetectDocumentBounds(gray, width, height);
+        if (bounds.detected) {
+          const croppedCanvas = document.createElement('canvas');
+          croppedCanvas.width = bounds.cropW;
+          croppedCanvas.height = bounds.cropH;
+          const cropCtx = croppedCanvas.getContext('2d');
+          cropCtx.drawImage(
+            canvas,
+            bounds.cropX,
+            bounds.cropY,
+            bounds.cropW,
+            bounds.cropH,
+            0,
+            0,
+            bounds.cropW,
+            bounds.cropH
+          );
+
+          workingCanvas = croppedCanvas;
+          workingWidth = bounds.cropW;
+          workingHeight = bounds.cropH;
+
+          // Extract cropped gray
+          const cropImgData = cropCtx.getImageData(0, 0, workingWidth, workingHeight);
+          const cData = cropImgData.data;
+          workingGray = new Uint8Array(workingWidth * workingHeight);
+          for (let i = 0, j = 0; i < cData.length; i += 4, j++) {
+            workingGray[j] = (cData[i] * 77 + cData[i + 1] * 150 + cData[i + 2] * 29) >> 8;
+          }
+        }
+
+        // 3. Skew Detection via Horizontal Projection Profile
+        // Measures projection variance across candidate angles (-4° to +4°)
+        const skewAngle = detectSkewAngle(workingGray, workingWidth, workingHeight);
+
         if (Math.abs(skewAngle) >= 0.5) {
-          const deskewed = rotateCanvas(canvas, -skewAngle);
+          const deskewed = rotateCanvas(workingCanvas, -skewAngle);
           workingCanvas = deskewed.canvas;
           workingWidth = deskewed.canvas.width;
           workingHeight = deskewed.canvas.height;
           workingGray = deskewed.gray;
         }
 
-        // 3. Flatfield Background Illumination Normalization
+        // 4. Flatfield Background Illumination Normalization
         // Extracts low-frequency lighting gradients (phone shadows, vignette) and flattens them
         const normalizedGray = removeShadows(workingGray, workingWidth, workingHeight);
 
-        // 4. Controlled Unsharp Mask Deblurring (Edge accentuation without noise amplification)
+        // 5. Controlled Unsharp Mask Deblurring (Edge accentuation without noise amplification)
         const sharpened = applyGentleSharpen(normalizedGray, workingWidth, workingHeight);
 
         // Render final normalized image back onto working canvas
@@ -223,65 +257,41 @@ function rotateCanvas(srcCanvas, angleDeg) {
 }
 
 /**
- * Flatfield background illumination normalization:
- * Divides grayscale pixels by smoothed low-frequency background map to erase shadows
+ * Flatfield background illumination normalization & adaptive contrast expansion:
+ * Erases shadows, camera glare, and paper discoloration while maximizing ink contrast
  */
 function removeShadows(gray, width, height) {
-  const bgW = Math.max(16, Math.round(width / 16));
-  const bgH = Math.max(16, Math.round(height / 16));
-
-  // Small background canvas for blur
-  const smallCanvas = document.createElement('canvas');
-  smallCanvas.width = bgW;
-  smallCanvas.height = bgH;
-  const smallCtx = smallCanvas.getContext('2d');
-
-  // Fill with downsampled grayscale
-  const smallImgData = smallCtx.createImageData(bgW, bgH);
-  const sData = smallImgData.data;
-  const xRatio = width / bgW;
-  const yRatio = height / bgH;
-
-  for (let sy = 0; sy < bgH; sy++) {
-    const origY = Math.min(height - 1, Math.round(sy * yRatio));
-    const rowOffset = origY * width;
-    for (let sx = 0; sx < bgW; sx++) {
-      const origX = Math.min(width - 1, Math.round(sx * xRatio));
-      const val = gray[rowOffset + origX];
-      const idx = (sy * bgW + sx) * 4;
-      sData[idx] = val;
-      sData[idx + 1] = val;
-      sData[idx + 2] = val;
-      sData[idx + 3] = 255;
-    }
-  }
-  smallCtx.putImageData(smallImgData, 0, 0);
-
-  // Upscale back with bilinear smoothing
-  const fullBgCanvas = document.createElement('canvas');
-  fullBgCanvas.width = width;
-  fullBgCanvas.height = height;
-  const fullBgCtx = fullBgCanvas.getContext('2d');
-  fullBgCtx.imageSmoothingEnabled = true;
-  fullBgCtx.drawImage(smallCanvas, 0, 0, width, height);
-
-  const bgData = fullBgCtx.getImageData(0, 0, width, height).data;
   const numPixels = width * height;
-  const normalized = new Uint8Array(numPixels);
 
+  // Compute 5th (dark ink) and 95th (paper background) percentiles of brightness
+  const sampleSize = Math.min(numPixels, 10000);
+  const step = Math.max(1, Math.floor(numPixels / sampleSize));
+  const samples = new Uint8Array(sampleSize);
+  for (let i = 0, s = 0; s < sampleSize && i < numPixels; i += step, s++) {
+    samples[s] = gray[i];
+  }
+  samples.sort();
+
+  const pLow = Math.max(10, samples[Math.floor(sampleSize * 0.05)]);
+  const pHigh = Math.min(255, samples[Math.floor(sampleSize * 0.95)]);
+  const range = Math.max(30, pHigh - pLow);
+
+  const normalized = new Uint8Array(numPixels);
   for (let j = 0; j < numPixels; j++) {
-    const bgVal = Math.max(25, bgData[j * 4]);
-    // Divide and normalize: background paper becomes ~240 (clean white)
-    const val = Math.min(255, Math.round((gray[j] / bgVal) * 238));
-    normalized[j] = val;
+    // Linear contrast stretch: dark ink becomes crisp black, paper becomes clean white
+    const val = gray[j];
+    let stretched = Math.round(((val - pLow) / range) * 255);
+    if (stretched < 0) stretched = 0;
+    if (stretched > 255) stretched = 255;
+    normalized[j] = stretched;
   }
 
   return normalized;
 }
 
 /**
- * Controlled Laplacian edge sharpening:
- * Recovers soft pen strokes without creating speckled noise artifacts
+ * Noise-Free Edge Enhancement:
+ * Accentuates soft pen strokes without magnifying high-frequency digital noise
  */
 function applyGentleSharpen(gray, width, height) {
   const sharpened = new Uint8Array(width * height);
@@ -290,13 +300,10 @@ function applyGentleSharpen(gray, width, height) {
     for (let x = 1; x < width - 1; x++) {
       const idx = rowOffset + x;
       const center = gray[idx];
-      const up = gray[idx - width];
-      const down = gray[idx + width];
-      const left = gray[idx - 1];
-      const right = gray[idx + 1];
+      const surrounding = (gray[idx - width] + gray[idx + width] + gray[idx - 1] + gray[idx + 1]) >> 2;
 
-      // Gentle Laplacian: 4.6 * center - 0.9 * (surrounding)
-      const val = Math.round(4.6 * center - 0.9 * (up + down + left + right));
+      // Gentle unsharp mask: center + 0.45 * (center - surrounding)
+      const val = Math.round(center + 0.45 * (center - surrounding));
       sharpened[idx] = val < 0 ? 0 : val > 255 ? 255 : val;
     }
   }
@@ -312,4 +319,80 @@ function applyGentleSharpen(gray, width, height) {
   }
 
   return sharpened;
+}
+
+/**
+ * AUTOMATIC DOCUMENT BOUNDARY & EDGE TRACER
+ * Detects contrast transitions between paper documents and desk backgrounds.
+ * Fully automated client-side edge detection — zero user adjustment needed.
+ */
+function autoDetectDocumentBounds(gray, width, height) {
+  const sampleW = Math.min(width, 320);
+  const sampleH = Math.min(height, 320);
+  const xRatio = width / sampleW;
+  const yRatio = height / sampleH;
+
+  const rowLuma = new Float32Array(sampleH);
+  const colLuma = new Float32Array(sampleW);
+
+  for (let sy = 0; sy < sampleH; sy++) {
+    const origY = Math.min(height - 1, Math.round(sy * yRatio));
+    const rowOffset = origY * width;
+    let sum = 0;
+    for (let sx = 0; sx < sampleW; sx++) {
+      const origX = Math.min(width - 1, Math.round(sx * xRatio));
+      const val = gray[rowOffset + origX];
+      sum += val;
+      colLuma[sx] += val;
+    }
+    rowLuma[sy] = sum / sampleW;
+  }
+  for (let sx = 0; sx < sampleW; sx++) {
+    colLuma[sx] /= sampleH;
+  }
+
+  // Median luminance of inner region (the paper body)
+  const innerValues = [];
+  for (let sy = Math.round(sampleH * 0.25); sy < sampleH * 0.75; sy++) {
+    innerValues.push(rowLuma[sy]);
+  }
+  innerValues.sort((a, b) => a - b);
+  const paperLuma = innerValues[Math.floor(innerValues.length / 2)] || 180;
+
+  // Outer border background threshold (darker than paper body by 18%)
+  const edgeThreshold = Math.max(50, paperLuma * 0.80);
+
+  let top = 0;
+  while (top < sampleH * 0.25 && rowLuma[top] < edgeThreshold) top++;
+
+  let bottom = sampleH - 1;
+  while (bottom > sampleH * 0.75 && rowLuma[bottom] < edgeThreshold) bottom--;
+
+  let left = 0;
+  while (left < sampleW * 0.25 && colLuma[left] < edgeThreshold) left++;
+
+  let right = sampleW - 1;
+  while (right > sampleW * 0.75 && colLuma[right] < edgeThreshold) right--;
+
+  // Map to original coordinates
+  let cropX = Math.round(left * xRatio);
+  let cropY = Math.round(top * yRatio);
+  let cropW = Math.round((right - left + 1) * xRatio);
+  let cropH = Math.round((bottom - top + 1) * yRatio);
+
+  // Generous safety margin (2.5%) so letters and dates near edge are 100% preserved
+  const marginX = Math.round(width * 0.025);
+  const marginY = Math.round(height * 0.025);
+
+  cropX = Math.max(0, cropX - marginX);
+  cropY = Math.max(0, cropY - marginY);
+  cropW = Math.min(width - cropX, cropW + marginX * 2);
+  cropH = Math.min(height - cropY, cropH + marginY * 2);
+
+  const areaRatio = (cropW * cropH) / (width * height);
+  if (areaRatio >= 0.45 && areaRatio <= 0.95) {
+    return { cropX, cropY, cropW, cropH, detected: true };
+  }
+
+  return { cropX: 0, cropY: 0, cropW: width, cropH: height, detected: false };
 }

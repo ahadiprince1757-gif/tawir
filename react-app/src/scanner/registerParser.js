@@ -79,42 +79,52 @@ function cleanClassName(str) {
 }
 
 export function isSystemHeaderLine(line) {
-  const lower = line.toLowerCase();
-  
-  // Table headers & administrative terms
-  const administrativeTerms = [
-    'attendance register', 'roll call', 'class register', 'term 1', 'term 2', 'term 3',
-    'academic year', 'teacher', 'signature', 'date:', 'ministry of education', 'page ',
-    's/no', 'serial no', 'adm no', 'admission number', 'student name', 'learner name',
-    'present', 'absent', 'total present', 'total absent', 'grand total', 'boys:', 'girls:',
-    'remarks', 'headteacher', 'class teacher', 'percentage', 'termly', 'checked by', 'verified by',
-    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
-    'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'
+  const lower = line.toLowerCase().trim();
+  if (!lower) return true;
+
+  // 1. Direct table header phrases & administrative titles
+  const headerPhrases = [
+    'attendance register', 'daily attendance', 'register of attendance',
+    'class register', 'names of pupils', 'name of pupil', 'names of students',
+    'student name', 'learner name', 'pupil name', 'date of birth', 'date of admission',
+    'school register', 'roll call', 'academic year', 'ministry of education',
+    'term 1', 'term 2', 'term 3', 'week ending', 'first week', 'second week',
+    'checked by', 'verified by', 'class teacher', 'head teacher', 'headteacher',
+    'total present', 'total absent', 'grand total', 'number on roll',
+    'remember when', 'look like', 'looked like'
   ];
 
-  if (administrativeTerms.some((term) => lower.includes(term))) {
-    if (
-      lower.includes('teacher') ||
-      lower.includes('signature') ||
-      lower.includes('page ') ||
-      lower.includes('date:') ||
-      lower.includes('attendance register') ||
-      lower.includes('total') ||
-      lower.includes('roll call')
-    ) {
-      return true;
-    }
-    const headerWordCount = administrativeTerms.filter((t) => lower.includes(t)).length;
-    if (headerWordCount >= 2) return true;
-  }
-
-  // Signature dots/dashes e.g. "Signature: ...................."
-  if (/[._\-]{5,}/.test(line)) {
+  if (headerPhrases.some((phrase) => lower.includes(phrase))) {
     return true;
   }
 
-  // Lines that are only numbers or punctuation (like totals row "18 20 22 90%")
-  if (/^[\d\s|.,+/%()\-#=_~]+$/.test(line)) {
+  // 2. Sentences / Social media captions / Prose detector:
+  // Student register rows never contain common English conversational connecting words
+  const proseWords = [
+    'remember', 'when', 'what', 'where', 'which', 'that', 'this', 'these', 'those',
+    'looked', 'looks', 'looking', 'look', 'like', 'seen', 'sees', 'seeing', 'see',
+    'with', 'without', 'from', 'about', 'into', 'through', 'between', 'during',
+    'before', 'after', 'above', 'below', 'there', 'their', 'they', 'them',
+    'were', 'was', 'have', 'had', 'has', 'would', 'should', 'could',
+    'does', 'did', 'been', 'being', 'said', 'says', 'saying', 'think', 'thought',
+    'just', 'very', 'really', 'more', 'most', 'other', 'only', 'also', 'back', 'even'
+  ];
+
+  const words = lower.split(/\s+/).map((w) => w.replace(/[^a-z]/g, '')).filter(Boolean);
+  if (words.length >= 3) {
+    const proseCount = words.filter((w) => proseWords.includes(w)).length;
+    if (proseCount >= 2 || (words.length >= 4 && proseCount >= 1)) {
+      return true; // This is an English sentence/caption, NOT a student record!
+    }
+  }
+
+  // 3. Signature dots/dashes e.g. "Signature: ...................."
+  if (/[._\-]{4,}/.test(line)) {
+    return true;
+  }
+
+  // 4. Lines that are only numbers or punctuation or single letter artifacts
+  if (/^[\d\s|.,+/%()\-#=_~rRlI!•]+$/.test(line)) {
     return true;
   }
 
@@ -154,8 +164,8 @@ export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
     }
   }
 
-  // 3. Strip row index: "1.", "1)", "1 ", "01.", "•"
-  text = text.replace(/^[\d#.\-•)\s]+/, '').trim();
+  // 3. Strip row index or single-character checkbox marks (e.g. "1.", "1)", "01.", "r ", "m ", "•")
+  text = text.replace(/^(?:[\d#.\-•)\s]+|[a-z]\s+)/i, '').trim();
 
   // 4. Extract Gender (M / F / Male / Female / Boy / Girl) with strict word boundaries
   let gender = '';
@@ -174,9 +184,9 @@ export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
     text = text.replace(secMatch[0], ' ');
   }
 
-  // 6. Strip attendance tick marks at the end of the line:
-  // e.g. "P P A P P", "1 0 1 1", "P. P. A.", "18/20", "95%", ". . a . ."
-  text = text.replace(/(?:\s+(?:[PAX\u2713\u2714\u2717\u2718]|[01]|present|absent|[.a])\.?)+\s*$/i, '');
+  // 6. Strip attendance tick marks & column numbers at the end of the line:
+  // e.g. "P P A P P", "1 1 1 0 1", "P. P. A.", "18/20", "95%", ". . a . ."
+  text = text.replace(/(?:\s+[\d|./%pPaxX\u2713\u2714\u2717\u2718\-]+)+\s*$/i, '');
   text = text.replace(/\s+\d{1,2}\/\d{1,2}\s*$/, '');
   text = text.replace(/\s+\d{1,3}%\s*$/, '');
   text = text.replace(/\s+\d{1,2}\s*$/, '');
@@ -200,17 +210,26 @@ export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
 
   if (nameWords.length === 0) return null;
 
-  // Filter out any administrative and non-name words
+  // Filter out any administrative, prose, and non-name words
   const nonNameKeywords = new Set([
     'total', 'present', 'absent', 'average', 'remarks', 'pass', 'fail',
     'score', 'grade', 'class', 'stream', 'gender', 'contact', 'name', 'date',
     'serial', 'number', 'term', 'week', 'day', 'sign', 'signature', 'year', 'month',
     'teacher', 'page', 'of', 'for', 'the', 'and', 'school', 'register', 'form',
-    'adm', 'admission', 'sec', 'section', 'boy', 'girl', 'male', 'female'
+    'adm', 'admission', 'sec', 'section', 'boy', 'girl', 'male', 'female',
+    'pupil', 'pupils', 'student', 'students', 'learner', 'learners',
+    'remember', 'when', 'what', 'where', 'which', 'that', 'this', 'these', 'those',
+    'looked', 'looks', 'looking', 'look', 'like', 'seen', 'sees', 'seeing', 'see',
+    'with', 'without', 'from', 'about', 'into', 'through', 'between', 'during',
+    'before', 'after', 'above', 'below', 'there', 'their', 'they', 'them',
+    'were', 'was', 'have', 'had', 'has', 'would', 'should', 'could',
+    'does', 'did', 'been', 'being', 'said', 'says', 'saying', 'think', 'thought',
+    'just', 'very', 'really', 'more', 'most', 'other', 'only', 'also', 'back', 'even'
   ]);
 
   const cleanWords = nameWords.filter((w) => !nonNameKeywords.has(w.toLowerCase()));
-  if (cleanWords.length === 0) return null;
+  // A genuine student name is 1, 2, or at most 3 words. Longer strings are prose or table noise.
+  if (cleanWords.length === 0 || cleanWords.length > 4) return null;
 
   // Title-case formatting
   const formattedWords = cleanWords.map((w) => {
@@ -285,7 +304,21 @@ export function isGibberishWord(word = '') {
 
 export function isGibberishName(name = '') {
   const parts = name.trim().split(/\s+/);
-  if (parts.length === 0) return true;
+  if (parts.length === 0 || parts.length > 4) return true;
+
+  const proseWords = new Set([
+    'remember', 'when', 'what', 'where', 'which', 'that', 'this', 'these', 'those',
+    'looked', 'looks', 'looking', 'look', 'like', 'seen', 'sees', 'seeing', 'see',
+    'with', 'without', 'from', 'about', 'into', 'through', 'between', 'during',
+    'before', 'after', 'above', 'below', 'there', 'their', 'they', 'them',
+    'were', 'was', 'have', 'had', 'has', 'would', 'should', 'could',
+    'does', 'did', 'been', 'being', 'said', 'says', 'saying', 'think', 'thought',
+    'just', 'very', 'really', 'more', 'most', 'other', 'only', 'also', 'back', 'even'
+  ]);
+
+  for (const p of parts) {
+    if (proseWords.has(p.toLowerCase())) return true;
+  }
 
   const gibberishCount = parts.filter(isGibberishWord).length;
   // If more than 30% of the words are gibberish, the whole line is noise

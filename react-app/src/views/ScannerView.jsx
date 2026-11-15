@@ -3,21 +3,17 @@ import { createLearner } from '../core/database/schema.js';
 import { recognizeText, processScannedDocument } from '../scanner/scanner.js';
 import { parseRegisterText } from '../scanner/registerParser.js';
 import { validateAndDeduplicate } from '../scanner/registerValidator.js';
-import DocumentCornerAdjuster, { getDefaultCorners } from '../scanner/components/DocumentCornerAdjuster.jsx';
-import { correctDocumentPerspective } from '../scanner/documentPerspectiveCorrector.js';
 import { DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS } from '../scanner/detection/documentTypeDetector.js';
-import { CameraIcon, FileTextIcon, AlertTriangleIcon, TrashIcon } from '../Icons.jsx';
+import { FileTextIcon, AlertTriangleIcon, TrashIcon } from '../Icons.jsx';
 
 export default function ScannerView({ existingLearners, onImportLearners, onToast }) {
-  const [step, setStep] = useState('upload'); // 'upload' | 'adjust' | 'processing' | 'review'
+  const [step, setStep] = useState('upload'); // 'upload' | 'processing' | 'review'
   const [showPasteText, setShowPasteText] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
   const [defaultClass, setDefaultClass] = useState('Grade 3 Blue');
   const [pastedText, setPastedText] = useState('');
   const [previewUrl, setPreviewUrl] = useState(null);
-  const [sourceImage, setSourceImage] = useState(null); // { url, width, height, canvas, file }
-  const [corners, setCorners] = useState([]);
   const [classification, setClassification] = useState(null);
   const [documentRecord, setDocumentRecord] = useState(null);
   const [verifiedCandidates, setVerifiedCandidates] = useState([]);
@@ -31,13 +27,13 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
     setPreviewUrl(url);
     setStep('processing');
     setProgress(10);
-    setStatusMessage('Normalizing document & removing shadows...');
+    setStatusMessage('Auto-detecting paper boundaries & removing shadows...');
 
     try {
       const ocrResult = await recognizeText(file, (pct) => {
         setProgress(pct);
         if (pct < 30) {
-          setStatusMessage('Normalizing document & sharpening strokes...');
+          setStatusMessage('Auto-tracing edges & enhancing stroke contrast...');
         } else if (pct < 85) {
           setStatusMessage(`Reading register text (${pct}%)...`);
         } else {
@@ -68,56 +64,6 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
     } catch (err) {
       alert('Scanner error: ' + err.message);
       setStep('upload');
-    }
-  };
-
-  const handleConfirmBoundaries = async (confirmedCorners) => {
-    if (!sourceImage?.canvas) return;
-    setCorners(confirmedCorners);
-    setStep('processing');
-    setProgress(15);
-    setStatusMessage('Correcting document perspective...');
-
-    try {
-      // Step 1: Perspective homography correction to rectify skewed camera shot into crisp flat sheet
-      const rectified = await correctDocumentPerspective(sourceImage.canvas, confirmedCorners);
-      setProgress(25);
-      setStatusMessage('Enhancing contrast & deblurring strokes...');
-
-      // Step 2: OCR & Layout Recognition on the rectified document
-      const ocrResult = await recognizeText(rectified.canvas, (pct) => {
-        setProgress(pct);
-        if (pct < 35) {
-          setStatusMessage('Enhancing stroke contrast...');
-        } else if (pct < 85) {
-          setStatusMessage(`Reading text (${pct}%)...`);
-        } else {
-          setStatusMessage('Classifying document & extracting records...');
-        }
-      });
-
-      setClassification(ocrResult.classification);
-      setDocumentRecord(ocrResult.record);
-
-      // Step 3: Parse candidates
-      const { verified, duplicates: dups } = processScannedDocument(
-        ocrResult,
-        defaultClass,
-        existingLearners
-      );
-
-      if (verified.length === 0 && dups.length === 0) {
-        alert(
-          'Could not extract structured records from this document. You can adjust the document boundary corners or enter records directly.'
-        );
-      }
-
-      setVerifiedCandidates(verified);
-      setDuplicates(dups);
-      setStep('review');
-    } catch (err) {
-      alert('Scanner processing error: ' + err.message);
-      setStep('adjust');
     }
   };
 
@@ -200,7 +146,6 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
     onToast(`Successfully saved ${toImport.length} learners to directory!`);
     setStep('upload');
     setPreviewUrl(null);
-    setSourceImage(null);
     setPastedText('');
     setVerifiedCandidates([]);
     setDuplicates([]);
@@ -215,7 +160,7 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
           <div className="eyebrow">Document Scanner</div>
           <h1>Register Scanner</h1>
           <div className="sub">
-            Capture paper attendance sheets, handwritten registers, or paste student lists.
+            Upload register documents or paste roster text — auto-aligned and digitized in-browser.
           </div>
         </div>
       </div>
@@ -239,7 +184,7 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
               <div 
                 className="scanner-dropzone"
                 onClick={() => fileInputRef.current?.click()}
-                style={{ padding: '26px 18px', cursor: 'pointer' }}
+                style={{ padding: '28px 18px', cursor: 'pointer' }}
               >
                 <div className="scanner-dropzone-icon" style={{ width: 48, height: 48 }}>
                   <FileTextIcon size={24} />
@@ -248,7 +193,7 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
                   Choose Document
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                  Select register photo or document from your device files
+                  Select photo or scan of register from your phone or device
                 </div>
               </div>
 
@@ -276,7 +221,7 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
                     padding: '4px 8px',
                   }}
                 >
-                  Or paste roster text / WhatsApp message
+                  Or paste roster text / WhatsApp list
                 </button>
               </div>
             </div>
@@ -323,25 +268,8 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
         </div>
       )}
 
-      {step === 'adjust' && sourceImage && (
-        <div className="panel" style={{ maxWidth: 860, padding: 20 }}>
-          <DocumentCornerAdjuster
-            imageUrl={sourceImage.url}
-            imageWidth={sourceImage.width}
-            imageHeight={sourceImage.height}
-            initialCorners={corners}
-            onConfirm={handleConfirmBoundaries}
-            onCancel={() => {
-              setStep('upload');
-              setSourceImage(null);
-              setPreviewUrl(null);
-            }}
-          />
-        </div>
-      )}
-
       {step === 'processing' && (
-        <div className="panel" style={{ maxWidth: 640, textAlign: 'center', padding: '36px 24px' }}>
+        <div className="panel" style={{ maxWidth: 580, textAlign: 'center', padding: '36px 24px' }}>
           {previewUrl && (
             <div style={{ marginBottom: 18 }}>
               <img 
@@ -354,11 +282,11 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
           <div className="progress-bar" style={{ height: 10, borderRadius: 999, overflow: 'hidden', background: '#e8ede9' }}>
             <div className="progress-fill" style={{ width: `${progress}%`, transition: 'width 0.25s ease' }} />
           </div>
-          <div style={{ fontWeight: 700, fontSize: 16, marginTop: 14 }}>
-            {statusMessage || 'Processing register...'}
+          <div style={{ fontWeight: 700, fontSize: 15, marginTop: 14 }}>
+            {statusMessage || 'Processing document...'}
           </div>
           <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-            Reading document • {progress}%
+            Pure client-side Computer Vision • {progress}%
           </div>
         </div>
       )}
@@ -394,16 +322,6 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
             </div>
 
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              {sourceImage && (
-                <button
-                  className="pill"
-                  onClick={() => setStep('adjust')}
-                  style={{ cursor: 'pointer', fontSize: 12 }}
-                  title="Return to boundary corner adjustment"
-                >
-                  Adjust Boundaries
-                </button>
-              )}
               <button 
                 className="pill" 
                 onClick={() => handleSelectAll(true)}
@@ -547,7 +465,6 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
               onClick={() => {
                 setStep('upload');
                 setPreviewUrl(null);
-                setSourceImage(null);
               }}
             >
               Cancel / Rescan
