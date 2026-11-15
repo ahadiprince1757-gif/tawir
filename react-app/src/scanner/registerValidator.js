@@ -24,8 +24,21 @@ export function validateAndDeduplicate(candidates = [], existingLearners = []) {
 
   // Internal deduplication within the newly scanned batch
   const seenInBatch = new Set();
+  const invalidNameKeywords = [
+    'sept', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug',
+    'preceding', 'surname', 'nil', 'summary', 'transfer', 'daily', 'attendance', 'register',
+    'remember', 'looked', 'week', 'totals', 'total', 'pupils', 'students'
+  ];
 
   for (const cand of candidates) {
+    const lowerName = (cand.name || '').toLowerCase();
+    const nameParts = lowerName.split(/\s+/).filter(Boolean);
+
+    // Strict guard: Real student records must have at least 2 words and never contain table/calendar keywords
+    if (nameParts.length < 2 || nameParts.some((p) => invalidNameKeywords.includes(p))) {
+      continue;
+    }
+
     const norm = normalizeName(cand.name);
     const clsNorm = normalizeName(cand.className);
     const key = `${norm}::${clsNorm}`;
