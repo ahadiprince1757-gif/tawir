@@ -14,7 +14,101 @@
 
 import { evaluateCandidateConfidence } from './confidenceEngine.js';
 
-export function parseRegisterText(input, defaultClass = '') {
+// ─────────────────────────────────────────────────────────
+// EXAM RESULT PARSER
+// Handles tables like: 1 Mehak 60 50 55 42 20 400 94% A Pass ...
+// Single-word student names are VALID here.
+// ─────────────────────────────────────────────────────────
+const EXAM_HEADER_PHRASES = [
+  'student marksheet', 'marksheet', 'final year examination', 'examination result',
+  'obtained marks', 'percentage', 'pok studies', 'sr no', 'subject', 'stats',
+  'student name', 'learner name', 'maths', 'english', 'remarks', 'grade',
+  'pass', 'fail', 'abc public school', 'public school',
+];
+
+function isExamHeaderLine(lower) {
+  return EXAM_HEADER_PHRASES.some((phrase) => lower.includes(phrase));
+}
+
+function parseExamResultLine(line, fallbackClass, ocrConfidence) {
+  const lower = line.toLowerCase().trim();
+  if (isExamHeaderLine(lower)) return null;
+
+  // Must contain at least 2 numbers (scores/marks) and at least one letter word
+  const numbers = line.match(/\d+/g) || [];
+  if (numbers.length < 2) return null;
+
+  // Extract percentage (e.g. "94%")
+  const pctMatch = line.match(/(\d{1,3})%/);
+  const percentage = pctMatch ? pctMatch[1] + '%' : '';
+
+  // Extract grade letter(s) (A, A1, B, C, etc.) — appears after percentage or at end
+  const gradeMatch = line.match(/\b(A\+?1?|A\+|B\+?|C\+?|D\+?|E|F|Pass|Fail)\b/i);
+  const grade = gradeMatch ? gradeMatch[1].toUpperCase() : '';
+
+  // Strip the percentage and grade and numbers from a working copy
+  let working = line
+    .replace(/\d{1,3}%/, ' ')
+    .replace(/\b(A\+?1?|A\+|B\+?|C\+?|D\+?|E|F|Pass|Fail)\b/gi, ' ')
+    .replace(/\d+/g, ' ')          // strip all remaining numbers
+    .replace(/[^a-zA-Z'\- ]/g, ' ') // strip punctuation
+    .trim();
+
+  // Extract the first genuine name word (ignoring known header words)
+  const headerSet = new Set([
+    'student', 'name', 'learner', 'pupil', 'sr', 'no', 'number',
+    'maths', 'math', 'english', 'stats', 'pok', 'studies', 'obtained',
+    'marks', 'percentage', 'grade', 'remarks', 'good', 'effect', 'keep',
+    'improving', 'needs', 'improvement', 'dont', 'quit', 'up', 'written',
+    'work', 'effort', 'pass', 'fail', 'school', 'abc', 'public',
+  ]);
+
+  const wordCandidates = working
+    .split(/\s+/)
+    .map((w) => w.replace(/[^a-zA-Z'\-]/g, ''))
+    .filter((w) => w.length >= 2 && !headerSet.has(w.toLowerCase()));
+
+  if (wordCandidates.length === 0) return null;
+
+  // Allow 1–3 name words for exam marksheets
+  const nameWords = wordCandidates.slice(0, 3);
+  if (nameWords.length === 0) return null;
+
+  // Each name word must have a vowel (not gibberish)
+  const validName = nameWords.every((w) => /[aeiouy]/i.test(w));
+  if (!validName) return null;
+
+  const fullName = nameWords
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+
+  // Row number as admission number
+  const rowNum = numbers[0] || '';
+
+  // Obtained/total marks (last multi-digit number before %)
+  const bigNumbers = (line.match(/\b\d{2,4}\b/g) || []).filter((n) => !n.endsWith('%'));
+  const totalMarks = bigNumbers.length > 0 ? bigNumbers[bigNumbers.length - 1] : '';
+
+  return {
+    name: fullName,
+    admissionNumber: rowNum,
+    className: fallbackClass || 'General',
+    section: grade,         // store grade in section field
+    gender: '',
+    contact: '',
+    percentage,
+    grade,
+    totalMarks,
+    status: 'needs_review',
+    reviewReason: percentage ? `${percentage} — ${grade}` : grade || '',
+    compositeConfidence: 72,
+    signals: { ocr: ocrConfidence, name: 80, admission: 70, context: 60 },
+    rawLine: line,
+    isExamRecord: true,
+  };
+}
+
+export function parseRegisterText(input, defaultClass = '', documentType = '') {
   if (!input) return [];
 
   // Support both raw string or structured OCR line objects: [{ text, confidence, bbox }]
@@ -38,6 +132,7 @@ export function parseRegisterText(input, defaultClass = '') {
       .filter((item) => item.text.length > 1);
   }
 
+  const isExamMode = documentType === 'examination_record';
   const candidates = [];
   let currentClassContext = defaultClass.trim() || 'General';
 
@@ -59,10 +154,18 @@ export function parseRegisterText(input, defaultClass = '') {
       continue;
     }
 
-    // 3. Parse candidate student row
-    const parsed = parseStudentLine(line, currentClassContext, rawOcrConf);
-    if (parsed) {
-      candidates.push(parsed);
+    if (isExamMode) {
+      // 3a. Exam marksheet row parser (single-word names, scores, grade, percentage)
+      const parsed = parseExamResultLine(line, currentClassContext, rawOcrConf);
+      if (parsed) {
+        candidates.push(parsed);
+      }
+    } else {
+      // 3b. Standard attendance/class-list row parser
+      const parsed = parseStudentLine(line, currentClassContext, rawOcrConf);
+      if (parsed) {
+        candidates.push(parsed);
+      }
     }
   }
 
@@ -93,7 +196,10 @@ export function isSystemHeaderLine(line) {
     'checked by', 'verified by', 'class teacher', 'head teacher', 'headteacher',
     'total present', 'total absent', 'grand total', 'number on roll',
     'surname preceding', 'in full', 'summary of totals', 'transfer',
-    'remember when', 'look like', 'looked like'
+    'remember when', 'look like', 'looked like',
+    // Exam marksheet headers
+    'student marksheet', 'marksheet', 'final year examination', 'examination result',
+    'obtained marks', 'pok studies', 'sr no', 'abc public school',
   ];
 
   if (headerPhrases.some((phrase) => lower.includes(phrase))) {
@@ -147,6 +253,7 @@ export function isSystemHeaderLine(line) {
 
 export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
   let text = line.trim();
+  let gender = '';
 
   // Strip table delimiters: "|", "+", "---"
   text = text.replace(/^[|+]+|[|+]+$/g, '').replace(/\|/g, ' ');

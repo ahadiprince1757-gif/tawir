@@ -152,6 +152,7 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
   };
 
   const keptCount = verifiedCandidates.filter((c) => c.keep && c.name.trim()).length;
+  const isExamDoc = classification?.type === 'examination_record';
 
   return (
     <section className="view active">
@@ -361,11 +362,21 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
                 <tr>
                   <th style={{ width: '44px', textAlign: 'center' }}>Keep</th>
                   <th style={{ width: '40px', textAlign: 'center' }}>#</th>
-                  <th style={{ width: '130px' }}>Admission No</th>
+                  <th style={{ width: '130px' }}>{isExamDoc ? 'Sr No' : 'Admission No'}</th>
                   <th>Learner Full Name</th>
                   <th style={{ width: '130px' }}>Class / Grade</th>
-                  <th style={{ width: '70px' }}>Sec</th>
-                  <th style={{ width: '100px' }}>Gender</th>
+                  {isExamDoc ? (
+                    <>
+                      <th style={{ width: '80px', textAlign: 'center' }}>Total</th>
+                      <th style={{ width: '70px', textAlign: 'center' }}>Pct</th>
+                      <th style={{ width: '60px', textAlign: 'center' }}>Grade</th>
+                    </>
+                  ) : (
+                    <>
+                      <th style={{ width: '70px' }}>Sec</th>
+                      <th style={{ width: '100px' }}>Gender</th>
+                    </>
+                  )}
                   <th style={{ width: '40px', textAlign: 'center' }}>Remove</th>
                 </tr>
               </thead>
@@ -391,7 +402,7 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
                         <input
                           type="text"
                           className="scanner-cell-input"
-                          placeholder="e.g. 3021"
+                          placeholder={isExamDoc ? 'Sr No' : 'e.g. 3021'}
                           value={cand.admissionNumber || ''}
                           onChange={(e) => handleEditField(idx, 'admissionNumber', e.target.value)}
                         />
@@ -415,27 +426,64 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
                           onChange={(e) => handleEditField(idx, 'className', e.target.value)}
                         />
                       </td>
-                      <td>
-                        <input
-                          type="text"
-                          className="scanner-cell-input"
-                          style={{ textAlign: 'center' }}
-                          placeholder="A"
-                          value={cand.section || ''}
-                          onChange={(e) => handleEditField(idx, 'section', e.target.value)}
-                        />
-                      </td>
-                      <td>
-                        <select
-                          className="scanner-cell-select"
-                          value={cand.gender || ''}
-                          onChange={(e) => handleEditField(idx, 'gender', e.target.value)}
-                        >
-                          <option value="">—</option>
-                          <option value="Male">Male</option>
-                          <option value="Female">Female</option>
-                        </select>
-                      </td>
+                      {isExamDoc ? (
+                        <>
+                          <td style={{ textAlign: 'center' }}>
+                            <input
+                              type="text"
+                              className="scanner-cell-input"
+                              style={{ textAlign: 'center' }}
+                              placeholder="—"
+                              value={cand.totalMarks || ''}
+                              onChange={(e) => handleEditField(idx, 'totalMarks', e.target.value)}
+                            />
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <input
+                              type="text"
+                              className="scanner-cell-input"
+                              style={{ textAlign: 'center' }}
+                              placeholder="—"
+                              value={cand.percentage || ''}
+                              onChange={(e) => handleEditField(idx, 'percentage', e.target.value)}
+                            />
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <input
+                              type="text"
+                              className="scanner-cell-input"
+                              style={{ textAlign: 'center', fontWeight: 700 }}
+                              placeholder="—"
+                              value={cand.grade || ''}
+                              onChange={(e) => handleEditField(idx, 'grade', e.target.value)}
+                            />
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td>
+                            <input
+                              type="text"
+                              className="scanner-cell-input"
+                              style={{ textAlign: 'center' }}
+                              placeholder="A"
+                              value={cand.section || ''}
+                              onChange={(e) => handleEditField(idx, 'section', e.target.value)}
+                            />
+                          </td>
+                          <td>
+                            <select
+                              className="scanner-cell-select"
+                              value={cand.gender || ''}
+                              onChange={(e) => handleEditField(idx, 'gender', e.target.value)}
+                            >
+                              <option value="">—</option>
+                              <option value="Male">Male</option>
+                              <option value="Female">Female</option>
+                            </select>
+                          </td>
+                        </>
+                      )}
                       <td style={{ textAlign: 'center' }}>
                         <button
                           className="row-delete-btn"
@@ -449,7 +497,7 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="8" className="empty">
+                    <td colSpan={isExamDoc ? 9 : 8} className="empty">
                       No candidate learners detected. Click "Add Row" or rescan.
                     </td>
                   </tr>

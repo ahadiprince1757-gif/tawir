@@ -118,7 +118,8 @@ export async function recognizeText(image, onProgress) {
  */
 export function processScannedDocument(ocrResult, defaultClass = '', existingLearners = []) {
   const linesToParse = ocrResult?.structuredLines || ocrResult?.rawText || ocrResult;
-  const candidates = parseRegisterText(linesToParse, defaultClass);
+  const documentType = ocrResult?.classification?.type || '';
+  const candidates = parseRegisterText(linesToParse, defaultClass, documentType);
   const { verified, duplicates } = validateAndDeduplicate(candidates, existingLearners);
 
   return {
