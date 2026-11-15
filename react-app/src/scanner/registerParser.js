@@ -1,112 +1,128 @@
 /**
  * PURE DETERMINISTIC REGISTER PARSER & MULTI-SIGNAL GRAMMAR ENGINE
- * 
- * Extracts real student records from physical school attendance registers:
- * - Parses columns: Row Index / Admission No / Full Name / Gender / Section / Attendance
- * - Strips table grid dividers (|) and misrecognized border characters (l, I, !)
- * - Strips attendance grids (P/A, 1/0, ticks, dots, percentages)
- * - Converts "LAST, FIRST" format to natural "First Last"
- * - Formats proper title casing (including O'Connor, Mwangi, etc.)
- * - NEVER SILENTLY DROPS STUDENTS: Faint/low-confidence names are marked with
- *   status: 'needs_review' rather than being deleted!
- * - Filters out document headers, totals, signatures, and pure noise
+ *
+ * Two parse modes:
+ *   1. Attendance / class-list mode  — 2–3 word names, gender codes, row numbers
+ *   2. Exam marksheet mode           — single-word names, scores, grade, percentage
+ *
+ * Mode is chosen by the documentType argument supplied by the classifier.
+ * If the classifier returns UNKNOWN, a structural heuristic (% count / row pattern)
+ * in the classifier itself forces exam mode — so the parser just trusts documentType.
  */
 
 import { evaluateCandidateConfidence } from './confidenceEngine.js';
 
-// ─────────────────────────────────────────────────────────
-// EXAM RESULT PARSER
-// Handles tables like: 1 Mehak 60 50 55 42 20 400 94% A Pass ...
-// Single-word student names are VALID here.
-// ─────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+// EXAM MARKSHEET PARSER
+// Row format: {rowNo} {Name} {score} {score} ... {total} {pct%} {grade} [remarks]
+// Key rule: the name is the FIRST alphabetic token group after the row number.
+// Everything after the name section begins with the first digit.
+// ═══════════════════════════════════════════════════════════
+
+/** Words that are NEVER student names in an exam table */
+const EXAM_NOISE_WORDS = new Set([
+  // Column headers
+  'student', 'name', 'learner', 'pupil', 'sr', 'no', 'number', 'sno',
+  'maths', 'math', 'english', 'stats', 'stat', 'pok', 'studies', 'study',
+  'obtained', 'marks', 'mark', 'percentage', 'pct', 'grade', 'grades',
+  'remarks', 'remark', 'pass', 'fail', 'subject', 'subjects', 'total',
+  // Remarks text fragments (OCR reads e.g. "Good effect keep improving")
+  'good', 'effect', 'keep', 'improving', 'improve', 'improvement',
+  'needs', 'need', 'dont', 'quit', 'written', 'work', 'effort', 'try',
+  'up', 'better', 'well', 'done', 'nicely', 'great', 'excellent',
+  'writing', 'reading', 'hard', 'more', 'focus', 'attention', 'but',
+  'imptov', 'imptovement', 'iquite', 'iqlite', // OCR noise from remarks
+  // School / document header words
+  'school', 'abc', 'public', 'final', 'year', 'examination', 'result',
+  'annual', 'half', 'yearly', 'term', 'class', 'section', 'stream',
+  'marksheet', 'sheet', 'card', 'report',
+]);
+
+/** Phrases that identify exam column-header rows — skip entirely */
 const EXAM_HEADER_PHRASES = [
   'student marksheet', 'marksheet', 'final year examination', 'examination result',
-  'obtained marks', 'percentage', 'pok studies', 'sr no', 'subject', 'stats',
-  'student name', 'learner name', 'maths', 'english', 'remarks', 'grade',
-  'pass', 'fail', 'abc public school', 'public school',
+  'obtained marks', 'percentage', 'pok studies', 'sr no', 'subject',
+  'student name', 'learner name', 'maths', 'english', 'remarks',
+  'abc public school', 'public school', 'result card', 'report card',
 ];
 
-function isExamHeaderLine(lower) {
-  return EXAM_HEADER_PHRASES.some((phrase) => lower.includes(phrase));
+function isExamHeaderLine(line) {
+  const lower = line.toLowerCase();
+  // Header phrases
+  if (EXAM_HEADER_PHRASES.some((p) => lower.includes(p))) return true;
+  // Lines with no digits are title/banner rows in a marksheet
+  if (!/\d/.test(line)) return true;
+  return false;
 }
 
 function parseExamResultLine(line, fallbackClass, ocrConfidence) {
-  const lower = line.toLowerCase().trim();
-  if (isExamHeaderLine(lower)) return null;
+  if (isExamHeaderLine(line)) return null;
 
-  // Must contain at least 2 numbers (scores/marks) and at least one letter word
   const numbers = line.match(/\d+/g) || [];
-  if (numbers.length < 2) return null;
+  // Need at least 3 numbers: row number + at least 2 subject scores
+  if (numbers.length < 3) return null;
 
-  // Extract percentage (e.g. "94%")
+  // Row MUST start with 1–3 digit serial number
+  if (!/^\d{1,3}\s/.test(line.trim())) return null;
+
+  // ── Extract percentage ────────────────────────────────────────────────────
   const pctMatch = line.match(/(\d{1,3})%/);
   const percentage = pctMatch ? pctMatch[1] + '%' : '';
 
-  // Extract grade letter(s) (A, A1, B, C, etc.) — appears after percentage or at end
-  const gradeMatch = line.match(/\b(A\+?1?|A\+|B\+?|C\+?|D\+?|E|F|Pass|Fail)\b/i);
+  // ── Extract grade (A, A1, B, C, D, E, F) ────────────────────────────────
+  const gradeMatch = line.match(/\b(A\+?1?|A\+|B\+?|C\+?|D\+?|E|F)\b/i);
   const grade = gradeMatch ? gradeMatch[1].toUpperCase() : '';
 
-  // Strip the percentage and grade and numbers from a working copy
-  let working = line
-    .replace(/\d{1,3}%/, ' ')
-    .replace(/\b(A\+?1?|A\+|B\+?|C\+?|D\+?|E|F|Pass|Fail)\b/gi, ' ')
-    .replace(/\d+/g, ' ')          // strip all remaining numbers
-    .replace(/[^a-zA-Z'\- ]/g, ' ') // strip punctuation
-    .trim();
+  // ── Extract total/obtained marks (largest 3-4 digit number before the %) ─
+  const prePercent = pctMatch ? line.slice(0, pctMatch.index) : line;
+  const bigNums = prePercent.match(/\b\d{3,4}\b/g) || [];
+  const totalMarks = bigNums.length > 0 ? bigNums[bigNums.length - 1] : '';
 
-  // Extract the first genuine name word (ignoring known header words)
-  const headerSet = new Set([
-    'student', 'name', 'learner', 'pupil', 'sr', 'no', 'number',
-    'maths', 'math', 'english', 'stats', 'pok', 'studies', 'obtained',
-    'marks', 'percentage', 'grade', 'remarks', 'good', 'effect', 'keep',
-    'improving', 'needs', 'improvement', 'dont', 'quit', 'up', 'written',
-    'work', 'effort', 'pass', 'fail', 'school', 'abc', 'public',
-  ]);
+  // ── Extract name ──────────────────────────────────────────────────────────
+  // Strip leading row number
+  let nameSection = line.trim().replace(/^\d{1,3}\s+/, '');
+  // Everything from the first digit onwards is scores — cut it off
+  nameSection = nameSection.replace(/\s+\d.*$/, '').trim();
+  // Also strip any stray grade/percentage tokens that slipped in
+  nameSection = nameSection.replace(/\d{1,3}%/g, '').replace(/\b[A-F]\d?\b/gi, '').trim();
 
-  const wordCandidates = working
+  const nameWords = nameSection
     .split(/\s+/)
     .map((w) => w.replace(/[^a-zA-Z'\-]/g, ''))
-    .filter((w) => w.length >= 2 && !headerSet.has(w.toLowerCase()));
+    .filter((w) => w.length >= 2 && !EXAM_NOISE_WORDS.has(w.toLowerCase()) && /[aeiouy]/i.test(w));
 
-  if (wordCandidates.length === 0) return null;
-
-  // Allow 1–3 name words for exam marksheets
-  const nameWords = wordCandidates.slice(0, 3);
   if (nameWords.length === 0) return null;
 
-  // Each name word must have a vowel (not gibberish)
-  const validName = nameWords.every((w) => /[aeiouy]/i.test(w));
-  if (!validName) return null;
-
-  const fullName = nameWords
+  const cleanName = nameWords
+    .slice(0, 3)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(' ');
 
-  // Row number as admission number
-  const rowNum = numbers[0] || '';
-
-  // Obtained/total marks (last multi-digit number before %)
-  const bigNumbers = (line.match(/\b\d{2,4}\b/g) || []).filter((n) => !n.endsWith('%'));
-  const totalMarks = bigNumbers.length > 0 ? bigNumbers[bigNumbers.length - 1] : '';
+  if (!cleanName || cleanName.length < 2) return null;
 
   return {
-    name: fullName,
-    admissionNumber: rowNum,
+    name: cleanName,
+    admissionNumber: numbers[0] || '',
     className: fallbackClass || 'General',
-    section: grade,         // store grade in section field
+    section: grade,
     gender: '',
     contact: '',
     percentage,
     grade,
     totalMarks,
+    keep: true,
     status: 'needs_review',
-    reviewReason: percentage ? `${percentage} — ${grade}` : grade || '',
+    reviewReason: [percentage, grade].filter(Boolean).join(' — '),
     compositeConfidence: 72,
     signals: { ocr: ocrConfidence, name: 80, admission: 70, context: 60 },
     rawLine: line,
     isExamRecord: true,
   };
 }
+
+// ═══════════════════════════════════════════════════════════
+// MAIN ENTRY POINT
+// ═══════════════════════════════════════════════════════════
 
 export function parseRegisterText(input, defaultClass = '', documentType = '') {
   if (!input) return [];
@@ -136,41 +152,38 @@ export function parseRegisterText(input, defaultClass = '', documentType = '') {
   const candidates = [];
   let currentClassContext = defaultClass.trim() || 'General';
 
-  // Header detection regex (e.g. "CLASS: GRADE 3 BLUE", "PP2 ATTENDANCE REGISTER", "Grade 4 East")
+  // Header detection regex (e.g. "CLASS: GRADE 3 BLUE", "PP2 ATTENDANCE REGISTER")
   const classHeaderRegex = /\b(?:class|grade|stream|room|form)\s*[:\-]?\s*([a-z0-9\s]+)\b/i;
 
   for (const entry of lineEntries) {
     const { text: line, confidence: rawOcrConf } = entry;
 
-    // 1. Check if line sets a new class context
+    // Check if line sets a new class context
     const headerMatch = line.match(classHeaderRegex);
     if (headerMatch && headerMatch[1].trim().length > 1 && headerMatch[1].trim().length < 25) {
       currentClassContext = cleanClassName(headerMatch[1].trim());
       continue;
     }
 
-    // 2. Skip document administrative / summary / signature lines
-    if (isSystemHeaderLine(line)) {
-      continue;
-    }
-
     if (isExamMode) {
-      // 3a. Exam marksheet row parser (single-word names, scores, grade, percentage)
+      // Exam marksheet row parser
       const parsed = parseExamResultLine(line, currentClassContext, rawOcrConf);
-      if (parsed) {
-        candidates.push(parsed);
-      }
+      if (parsed) candidates.push(parsed);
     } else {
-      // 3b. Standard attendance/class-list row parser
+      // Skip document administrative / summary / signature lines
+      if (isSystemHeaderLine(line)) continue;
+      // Standard attendance/class-list row parser
       const parsed = parseStudentLine(line, currentClassContext, rawOcrConf);
-      if (parsed) {
-        candidates.push(parsed);
-      }
+      if (parsed) candidates.push(parsed);
     }
   }
 
   return candidates;
 }
+
+// ═══════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════
 
 function cleanClassName(str) {
   return str
@@ -197,16 +210,14 @@ export function isSystemHeaderLine(line) {
     'total present', 'total absent', 'grand total', 'number on roll',
     'surname preceding', 'in full', 'summary of totals', 'transfer',
     'remember when', 'look like', 'looked like',
-    // Exam marksheet headers
+    // Exam marksheet headers (guard against exam lines being processed in attendance mode)
     'student marksheet', 'marksheet', 'final year examination', 'examination result',
     'obtained marks', 'pok studies', 'sr no', 'abc public school',
   ];
 
-  if (headerPhrases.some((phrase) => lower.includes(phrase))) {
-    return true;
-  }
+  if (headerPhrases.some((phrase) => lower.includes(phrase))) return true;
 
-  // 2. Sentences / Social media captions / Prose detector:
+  // 2. Sentences / Social media captions / Prose detector
   const proseWords = [
     'remember', 'when', 'what', 'where', 'which', 'that', 'this', 'these', 'those',
     'looked', 'looks', 'looking', 'look', 'like', 'seen', 'sees', 'seeing', 'see',
@@ -214,42 +225,35 @@ export function isSystemHeaderLine(line) {
     'before', 'after', 'above', 'below', 'there', 'their', 'they', 'them',
     'were', 'was', 'have', 'had', 'has', 'would', 'should', 'could',
     'does', 'did', 'been', 'being', 'said', 'says', 'saying', 'think', 'thought',
-    'just', 'very', 'really', 'more', 'most', 'other', 'only', 'also', 'back', 'even'
+    'just', 'very', 'really', 'more', 'most', 'other', 'only', 'also', 'back', 'even',
   ];
 
   const words = lower.split(/\s+/).map((w) => w.replace(/[^a-z]/g, '')).filter(Boolean);
   if (words.length >= 3) {
     const proseCount = words.filter((w) => proseWords.includes(w)).length;
-    if (proseCount >= 2 || (words.length >= 4 && proseCount >= 1)) {
-      return true;
-    }
+    if (proseCount >= 2 || (words.length >= 4 && proseCount >= 1)) return true;
   }
 
-  // 3. Monthly statistics rows at bottom of attendance sheet (e.g. "SEPT 17 NIL 45 2 0 4 44", "OCT 21 44...")
+  // 3. Monthly statistics rows at bottom of attendance sheet
   const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'sept', 'oct', 'nov', 'dec'];
-  if (words.length >= 1 && months.includes(words[0])) {
-    return true; // Monthly summary statistical line, NOT a student line!
-  }
+  if (words.length >= 1 && months.includes(words[0])) return true;
 
-  // 4. Lines with multiple days of the week (column header "Mon Tue Wed Thu Fri")
+  // 4. Lines with multiple days of the week (column headers)
   const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-  const dayCount = words.filter((w) => days.includes(w)).length;
-  if (dayCount >= 2) {
-    return true;
-  }
+  if (words.filter((w) => days.includes(w)).length >= 2) return true;
 
-  // 5. Signature dots/dashes e.g. "Signature: ...................."
-  if (/[._\-]{4,}/.test(line)) {
-    return true;
-  }
+  // 5. Signature dots/dashes
+  if (/[._\-]{4,}/.test(line)) return true;
 
-  // 6. Lines that are only numbers or punctuation or single letter artifacts
-  if (/^[\d\s|.,+/%()\-#=_~rRlI!•]+$/.test(line)) {
-    return true;
-  }
+  // 6. Lines that are only numbers or punctuation
+  if (/^[\d\s|.,+/%()\-#=_~rRlI!•]+$/.test(line)) return true;
 
   return false;
 }
+
+// ═══════════════════════════════════════════════════════════
+// ATTENDANCE REGISTER ROW PARSER
+// ═══════════════════════════════════════════════════════════
 
 export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
   let text = line.trim();
@@ -258,17 +262,17 @@ export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
   // Strip table delimiters: "|", "+", "---"
   text = text.replace(/^[|+]+|[|+]+$/g, '').replace(/\|/g, ' ');
 
-  // Strip standalone table border artifacts (single letters like 'l', 'I', '!' left from '|' dividers)
+  // Strip standalone table border artifacts ('l', 'I', '!' from '|' dividers)
   text = text.replace(/(?:^|\s)[|!Il](?=\s|$)/g, ' ').trim();
 
-  // 1. Extract leading single-letter gender code if present: "f ", "m ", "F ", "M " (e.g. "f Abraham Kathy", "m Acton Paul")
+  // 1. Extract leading single-letter gender code (e.g. "f Abraham Kathy", "m Acton Paul")
   const leadGenderMatch = text.match(/^(?:([fmFM])\s+|([fmFM])(?=[A-Z]))/);
   if (leadGenderMatch) {
     gender = (leadGenderMatch[1] || leadGenderMatch[2]).toUpperCase() === 'M' ? 'Male' : 'Female';
     text = text.replace(/^(?:[fmFM]\s+|[fmFM](?=[A-Z]))/, '').trim();
   }
 
-  // 2. Extract phone number / contact if present
+  // 2. Extract phone number / contact
   let contact = '';
   const phoneMatch = text.match(/(?:\+?254|0)[17]\d{8}|\b(?:\+?1-?)?\d{3}[-.\s]\d{3}[-.\s]\d{4}\b/);
   if (phoneMatch) {
@@ -276,14 +280,13 @@ export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
     text = text.replace(contact, ' ');
   }
 
-  // 3. Extract admission number / row index number (1 to 45, or 3021)
+  // 3. Extract admission number / row index number
   let admissionNumber = '';
   const prefixedAdmMatch = text.match(/\b(?:stu-?\d{3,8}|adm(?:ission)?(?:\s*no\.?)?[\/:\s-]*\w+|\#\d{1,7})\b/i);
   if (prefixedAdmMatch) {
     admissionNumber = prefixedAdmMatch[0].replace(/^(?:adm(?:ission)?(?:\s*no\.?)?[\/:\s-]*|\#)/i, '').trim();
     text = text.replace(prefixedAdmMatch[0], ' ');
   } else {
-    // Standalone 1-6 digit number near end or start of line (avoiding calendar years like 2026)
     const standaloneNumMatch = text.match(/(?:^|[\s,])(\d{1,6})(?:[\s,]|$)/);
     if (standaloneNumMatch && !/^(?:202[0-9]|19\d{2})$/.test(standaloneNumMatch[1])) {
       admissionNumber = standaloneNumMatch[1];
@@ -291,10 +294,10 @@ export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
     }
   }
 
-  // 4. Strip row index or single-character checkbox marks (e.g. "1.", "1)", "01.", "r ", "•")
+  // 4. Strip row index / checkbox marks
   text = text.replace(/^(?:[\d#.\-•)\s]+|[a-z]\s+)/i, '').trim();
 
-  // 5. Extract Gender words (Male / Female / Boy / Girl / [MF]) if not already extracted
+  // 5. Extract Gender words
   if (!gender) {
     const genderMatch = text.match(/(?:^|\s|\()(male|female|boy|girl|[MF])(?:\s|\)|$)/i);
     if (genderMatch) {
@@ -304,7 +307,7 @@ export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
     }
   }
 
-  // 6. Extract Section (e.g. "Stream B", "Sec C", "(A)", "East", "Blue")
+  // 6. Extract Section
   let section = '';
   const secMatch = text.match(/\b(?:sec|stream|section)\s*[:\-]?\s*([A-Za-z0-9]+)\b/i) || text.match(/\(([A-C])\)/i);
   if (secMatch) {
@@ -312,17 +315,16 @@ export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
     text = text.replace(secMatch[0], ' ');
   }
 
-  // 7. Strip attendance tick marks & column numbers at the end of the line:
-  // e.g. "P P A P P", "1 1 1 0 1", "P. P. A.", "18/20", "95%", ". . a . .", "A A A A A A"
+  // 7. Strip attendance tick marks & column numbers at end of line
   text = text.replace(/(?:\s+(?:[apx10./\\|\-#\u2713\u2714\u2717\u2718]|aa|ab|nil|\d{1,3}))+\s*$/i, '');
   text = text.replace(/\s+\d{1,2}\/\d{1,2}\s*$/, '');
   text = text.replace(/\s+\d{1,3}%\s*$/, '');
   text = text.replace(/\s+\d{1,2}\s*$/, '');
 
-  // 8. Strip stray parenthesis, brackets, and symbols
+  // 8. Strip stray parenthesis / brackets / symbols
   text = text.replace(/[\(\)\[\]\{\}_*~^`]/g, ' ').trim();
 
-  // 9. Handle "LAST, FIRST" name format (e.g. "Mwangi, Brian" -> "Brian Mwangi")
+  // 9. Handle "LAST, FIRST" name format
   if (text.includes(',')) {
     const parts = text.split(',').map((p) => p.trim());
     if (parts.length === 2 && parts[0] && parts[1]) {
@@ -330,7 +332,7 @@ export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
     }
   }
 
-  // 10. Extract alphabetic words that form a realistic student name
+  // 10. Extract alphabetic words
   const nameWords = text
     .split(/\s+/)
     .map((w) => w.replace(/[^a-zA-Z'\-]/g, ''))
@@ -338,7 +340,7 @@ export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
 
   if (nameWords.length === 0) return null;
 
-  // Filter out any administrative, prose, calendar, and non-name words
+  // Filter administrative / prose / calendar words
   const nonNameKeywords = new Set([
     'total', 'totals', 'present', 'absent', 'average', 'remarks', 'pass', 'fail',
     'score', 'grade', 'class', 'stream', 'gender', 'contact', 'name', 'names', 'date', 'dates',
@@ -348,32 +350,27 @@ export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
     'pupil', 'pupils', 'student', 'students', 'learner', 'learners', 'roll', 'call',
     'daily', 'attendance', 'full', 'surname', 'preceding', 'nil', 'summary', 'transfer',
     'admitted', 're-admitted', 'left', 'ending', 'beginning', 'session', 'times', 'half',
-
-    // Months & abbreviations
+    // Months
     'jan', 'january', 'feb', 'february', 'mar', 'march', 'apr', 'april', 'may',
     'jun', 'june', 'jul', 'july', 'aug', 'august', 'sep', 'sept', 'september',
     'oct', 'october', 'nov', 'november', 'dec', 'december',
-
-    // Days & abbreviations
+    // Days
     'mon', 'monday', 'tue', 'tues', 'tuesday', 'wed', 'wednesday',
     'thu', 'thur', 'thurs', 'thursday', 'fri', 'friday', 'sat', 'saturday', 'sun', 'sunday',
-
-    // Prose & Caption words
+    // Prose & captions
     'remember', 'when', 'what', 'where', 'which', 'that', 'this', 'these', 'those',
     'looked', 'looks', 'looking', 'look', 'like', 'seen', 'sees', 'seeing', 'see',
     'with', 'without', 'from', 'about', 'into', 'through', 'between', 'during',
     'before', 'after', 'above', 'below', 'there', 'their', 'they', 'them',
     'were', 'was', 'have', 'had', 'has', 'would', 'should', 'could',
     'does', 'did', 'been', 'being', 'said', 'says', 'saying', 'think', 'thought',
-    'just', 'very', 'really', 'more', 'most', 'other', 'only', 'also', 'back', 'even'
+    'just', 'very', 'really', 'more', 'most', 'other', 'only', 'also', 'back', 'even',
   ]);
 
   const cleanWords = nameWords.filter((w) => !nonNameKeywords.has(w.toLowerCase()));
-  // A genuine student name in school attendance registers is 2 or 3 words (Surname + Given Name).
-  // Single isolated words or lines with >3 words are table headings, summary rows, or captions.
+  // Genuine attendance register student name: 2 or 3 words
   if (cleanWords.length < 2 || cleanWords.length > 3) return null;
 
-  // Title-case formatting
   const formattedWords = cleanWords.map((w) => {
     if (w.includes("'")) {
       return w.split("'").map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join("'");
@@ -384,7 +381,6 @@ export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
   const fullName = formattedWords.join(' ');
   if (fullName.length < 2) return null;
 
-  // Multi-signal evaluation
   const confidenceEval = evaluateCandidateConfidence({
     ocrConfidence,
     name: fullName,
@@ -394,10 +390,7 @@ export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
     isHeader: false,
   });
 
-  // If purely non-name noise, discard
-  if (confidenceEval.status === 'noise') {
-    return null;
-  }
+  if (confidenceEval.status === 'noise') return null;
 
   return {
     name: fullName,
@@ -406,7 +399,8 @@ export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
     section: section || '',
     gender: gender || '',
     contact: contact || '',
-    status: confidenceEval.status, // 'verified' | 'needs_review'
+    keep: true,
+    status: confidenceEval.status,
     reviewReason: confidenceEval.reviewReason,
     compositeConfidence: confidenceEval.compositeScore,
     signals: confidenceEval.signals,
@@ -414,33 +408,17 @@ export function parseStudentLine(line, fallbackClass, ocrConfidence = 80) {
   };
 }
 
-/**
- * Detects OCR hallucinated noise / gibberish generated from paper smudges, wrinkles, or blur
- */
+// ═══════════════════════════════════════════════════════════
+// GIBBERISH DETECTORS
+// ═══════════════════════════════════════════════════════════
+
 export function isGibberishWord(word = '') {
   const w = word.trim().toLowerCase();
   if (w.length <= 1) return true;
-
-  // Real human name words must contain at least one vowel (a, e, i, o, u, y)
-  if (w.length >= 2 && !/[aeiouy]/.test(w)) {
-    return true;
-  }
-
-  // Reject unnatural consonant clusters (e.g. "xkpth", "qzrbm")
-  if (/[bcdfghjklmnpqrstvwxz]{5,}/.test(w)) {
-    return true;
-  }
-
-  // Reject triple repeated characters (e.g. "xxx", "lll")
-  if (/([a-z])\1{2,}/.test(w)) {
-    return true;
-  }
-
-  // Reject words with impossible letter combinations
-  if (/(?:qx|qz|jx|qj|wq|zx|xx|jj|vvv)/.test(w)) {
-    return true;
-  }
-
+  if (w.length >= 2 && !/[aeiouy]/.test(w)) return true;
+  if (/[bcdfghjklmnpqrstvwxz]{5,}/.test(w)) return true;
+  if (/([a-z])\1{2,}/.test(w)) return true;
+  if (/(?:qx|qz|jx|qj|wq|zx|xx|jj|vvv)/.test(w)) return true;
   return false;
 }
 
@@ -455,7 +433,7 @@ export function isGibberishName(name = '') {
     'before', 'after', 'above', 'below', 'there', 'their', 'they', 'them',
     'were', 'was', 'have', 'had', 'has', 'would', 'should', 'could',
     'does', 'did', 'been', 'being', 'said', 'says', 'saying', 'think', 'thought',
-    'just', 'very', 'really', 'more', 'most', 'other', 'only', 'also', 'back', 'even'
+    'just', 'very', 'really', 'more', 'most', 'other', 'only', 'also', 'back', 'even',
   ]);
 
   for (const p of parts) {
@@ -463,6 +441,5 @@ export function isGibberishName(name = '') {
   }
 
   const gibberishCount = parts.filter(isGibberishWord).length;
-  // If more than 30% of the words are gibberish, the whole line is noise
   return gibberishCount / parts.length > 0.30;
 }

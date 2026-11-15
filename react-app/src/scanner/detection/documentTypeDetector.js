@@ -129,11 +129,21 @@ const RULES = {
 
   [DOCUMENT_TYPES.EXAMINATION_RECORD]: {
     strong: [
-      /examination\s+results/i,
-      /marks\s+register/i,
-      /academic\s+results/i,
+      /examination\s+results?/i,
+      /marks?\s+register/i,
+      /academic\s+results?/i,
       /assessment\s+record/i,
       /examination\s+register/i,
+      /student\s+marksheet/i,
+      /\bmarksheet\b/i,
+      /final\s+year\s+examination/i,
+      /examination\s+result/i,
+      /year\s+examination\s+result/i,
+      /obtained\s+marks/i,
+      /result\s+sheet/i,
+      /result\s+card/i,
+      /progress\s+report/i,
+      /report\s+card/i,
     ],
     supporting: [
       /\bmarks\b/i,
@@ -142,6 +152,11 @@ const RULES = {
       /\bsubject\b/i,
       /\btotal\b/i,
       /\bposition\b/i,
+      /\bpercentage\b/i,
+      /\bpass\b/i,
+      /\bremarks\b/i,
+      /\bsr\.?\s*no\b/i,
+      /\bobtained\b/i,
     ],
     negative: [],
   },
@@ -220,6 +235,25 @@ export function detectDocumentType(rawText) {
       confidence: 0,
       status: 'insufficient_text',
       evidence: [],
+      candidates: [],
+    };
+  }
+
+  // ── Structural signal: count lines matching exam row pattern ──────────────
+  // e.g. "1 Mehak 60 50 55 42 20 400 94% A"  → number, word, 3+ numbers, percentage
+  const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const examRowPattern = /^\d{1,3}\s+[A-Za-z]{2,}\s+(?:\d+\s+){2,}\d+\s+\d{1,3}%/;
+  const examRowCount = lines.filter((l) => examRowPattern.test(l)).length;
+  const percentageCount = (rawText.match(/\d{1,3}%/g) || []).length;
+
+  // If 3+ structured exam rows OR 8+ percentage values → almost certainly a marksheet
+  if (examRowCount >= 3 || percentageCount >= 8) {
+    return {
+      type: DOCUMENT_TYPES.EXAMINATION_RECORD,
+      label: DOCUMENT_TYPE_LABELS[DOCUMENT_TYPES.EXAMINATION_RECORD],
+      confidence: 0.88,
+      status: 'probable_match',
+      evidence: [{ type: 'structural', pattern: `${examRowCount} exam rows, ${percentageCount} percentage values` }],
       candidates: [],
     };
   }
