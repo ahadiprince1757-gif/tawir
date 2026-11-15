@@ -25,31 +25,50 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
 
   const fileInputRef = useRef(null);
 
-  const handleSelectImageFile = (file) => {
+  const handleSelectImageFile = async (file) => {
     if (!file) return;
     const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
+    setPreviewUrl(url);
+    setStep('processing');
+    setProgress(10);
+    setStatusMessage('Normalizing document & removing shadows...');
 
-      const initialCorners = getDefaultCorners(img.width, img.height);
-      setSourceImage({
-        url,
-        width: img.width,
-        height: img.height,
-        canvas,
-        file,
+    try {
+      const ocrResult = await recognizeText(file, (pct) => {
+        setProgress(pct);
+        if (pct < 30) {
+          setStatusMessage('Normalizing document & sharpening strokes...');
+        } else if (pct < 85) {
+          setStatusMessage(`Reading register text (${pct}%)...`);
+        } else {
+          setStatusMessage('Classifying document & extracting records...');
+        }
       });
-      setCorners(initialCorners);
-      setPreviewUrl(url);
-      setStep('adjust');
-    };
-    img.src = url;
+
+      setClassification(ocrResult.classification);
+      setDocumentRecord(ocrResult.record);
+
+      const { verified, duplicates: dups } = processScannedDocument(
+        ocrResult,
+        defaultClass,
+        existingLearners
+      );
+
+      if (verified.length === 0 && dups.length === 0) {
+        alert(
+          'Could not detect student records from this document. Please ensure the document is legible, or use the "Paste roster text" option below.'
+        );
+        setStep('upload');
+        return;
+      }
+
+      setVerifiedCandidates(verified);
+      setDuplicates(dups);
+      setStep('review');
+    } catch (err) {
+      alert('Scanner error: ' + err.message);
+      setStep('upload');
+    }
   };
 
   const handleConfirmBoundaries = async (confirmedCorners) => {

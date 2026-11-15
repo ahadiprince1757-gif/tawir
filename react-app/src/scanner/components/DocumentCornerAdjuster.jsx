@@ -167,15 +167,26 @@ export default function DocumentCornerAdjuster({
   }
 
   return (
-    <div className="document-adjuster">
-      <div className="document-adjuster__header">
-        <div>
-          <h3>Adjust document boundaries</h3>
-          <p>Drag the four corners to match the edges of the paper.</p>
-        </div>
+    <div className="document-adjuster" style={{ width: '100%', maxWidth: 700, margin: '0 auto' }}>
+      <div className="document-adjuster__header" style={{ marginBottom: 14 }}>
+        <h3 style={{ margin: 0, fontSize: 16 }}>Adjust Document Boundaries</h3>
+        <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--muted)' }}>
+          Drag the four corners to match the edges of the paper.
+        </p>
       </div>
 
-      <div className="document-adjuster__image">
+      <div
+        className="document-adjuster__image"
+        style={{
+          position: 'relative',
+          overflow: 'hidden',
+          width: '100%',
+          maxWidth: '100%',
+          borderRadius: 8,
+          border: '1px solid var(--line)',
+          background: '#000',
+        }}
+      >
         <img
           src={imageUrl}
           alt="Original school document"
@@ -184,6 +195,9 @@ export default function DocumentCornerAdjuster({
             display: 'block',
             width: '100%',
             height: 'auto',
+            maxHeight: '65vh',
+            objectFit: 'contain',
+            margin: '0 auto',
           }}
         />
 
@@ -199,16 +213,16 @@ export default function DocumentCornerAdjuster({
             inset: 0,
             width: '100%',
             height: '100%',
-            overflow: 'visible',
+            overflow: 'hidden',
             touchAction: 'none',
           }}
         >
           {/* Selected page boundary */}
           <polygon
             points={corners.map((p) => `${p.x},${p.y}`).join(' ')}
-            fill="rgba(30, 180, 110, 0.12)"
+            fill="rgba(30, 180, 110, 0.15)"
             stroke="#16a36a"
-            strokeWidth={Math.max(3, imageWidth / 400)}
+            strokeWidth={Math.max(2, imageWidth / 500)}
           />
 
           {/* Corner handles */}
@@ -217,10 +231,10 @@ export default function DocumentCornerAdjuster({
               <circle
                 cx={point.x}
                 cy={point.y}
-                r={Math.max(18, imageWidth / 45)}
-                fill="rgba(22, 163, 106, 0.25)"
+                r={Math.max(14, imageWidth / 60)}
+                fill="rgba(22, 163, 106, 0.35)"
                 stroke="#16a36a"
-                strokeWidth={Math.max(3, imageWidth / 500)}
+                strokeWidth={Math.max(2, imageWidth / 600)}
                 style={{
                   cursor: 'grab',
                   touchAction: 'none',
@@ -231,29 +245,14 @@ export default function DocumentCornerAdjuster({
               <circle
                 cx={point.x}
                 cy={point.y}
-                r={Math.max(7, imageWidth / 120)}
+                r={Math.max(5, imageWidth / 160)}
                 fill="#ffffff"
                 stroke="#16a36a"
-                strokeWidth={Math.max(2, imageWidth / 500)}
+                strokeWidth={Math.max(1.5, imageWidth / 600)}
                 style={{
                   pointerEvents: 'none',
                 }}
               />
-
-              <text
-                x={point.x}
-                y={point.y - imageWidth / 35}
-                textAnchor="middle"
-                fontSize={imageWidth / 40}
-                fontWeight="bold"
-                fill="#ffffff"
-                stroke="#111111"
-                strokeWidth={imageWidth / 350}
-                paintOrder="stroke"
-                pointerEvents="none"
-              >
-                {CORNER_LABELS[index]}
-              </text>
             </g>
           ))}
         </svg>
