@@ -69,7 +69,32 @@ class TawiDRE:
         image = preprocess(raw_image)
         h, w = image.shape[:2]
 
-        # 2. Geometric Line Detection
+        # ── Dedicated Physical School Register Reconstruction ────────────────
+        if doc_type == DocumentType.ATTENDANCE_REGISTER:
+            from app.reconstruction.register_analyzer import analyze_attendance_register
+            records, cells, summary = analyze_attendance_register(raw_image)
+
+            overall_conf = (
+                sum(r.composite_confidence for r in records) / len(records)
+                if records else 0.90
+            )
+
+            return DocumentProcessingResult(
+                document_id=doc_id,
+                document_type=doc_type,
+                image_width=w,
+                image_height=h,
+                total_rows=len(records),
+                total_columns=summary.get("total_days_evaluated", 25) + 3,
+                total_cells=len(cells),
+                cells=cells,
+                records=records,
+                overall_confidence=round(overall_conf, 4),
+                verification_required=(overall_conf < 0.90),
+                summary=summary
+            )
+
+        # 2. Geometric Line Detection (for marks registers / general forms)
         horizontal_lines, vertical_lines = detect_lines(image)
 
         # 3. Grid Reconstruction

@@ -87,6 +87,7 @@ class StudentRecord(BaseModel):
     admission_number: Optional[str] = None
     student_name: str
     gender: Optional[str] = None
+    name_snippet_base64: Optional[str] = None
     attendance_marks: List[AttendanceDayRecord] = Field(default_factory=list)
     total_present: int = 0
     total_absent: int = 0

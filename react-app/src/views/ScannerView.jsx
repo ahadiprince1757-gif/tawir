@@ -514,6 +514,26 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
                         />
                       </td>
                       <td>
+                        {cand.nameSnippet && (
+                          <div style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <img
+                              src={cand.nameSnippet}
+                              alt={`Row ${cand.admissionNumber || idx + 1} snippet`}
+                              style={{
+                                height: 26,
+                                maxWidth: 190,
+                                objectFit: 'contain',
+                                border: '1px solid #d0d7de',
+                                borderRadius: 4,
+                                background: '#ffffff',
+                                display: 'block',
+                              }}
+                            />
+                            <span style={{ fontSize: 10, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                              Original snippet
+                            </span>
+                          </div>
+                        )}
                         <input
                           type="text"
                           className="scanner-cell-input"

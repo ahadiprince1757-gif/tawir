@@ -159,6 +159,7 @@ export function processDREResult(dreResult, defaultClass = '', existingLearners 
       compositeConfidence: Math.round(rec.composite_confidence * 100),
       isDRERecord: true,
       rowIndex: rec.row_index,
+      nameSnippet: rec.name_snippet_base64 || null,
     };
   });
 
