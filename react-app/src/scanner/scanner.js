@@ -5,6 +5,7 @@ import { parseRegisterText } from './registerParser.js';
 import { validateAndDeduplicate } from './registerValidator.js';
 import { detectDocumentType, DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS } from './detection/documentTypeDetector.js';
 import { createDocumentRecord } from './core/documentRecord.js';
+import { checkDREHealth, processWithDRE, verifyDRECell } from './dreClient.js';
 
 export { normalizeDocument } from './documentNormalizer.js';
 export { detectRegisterLayout } from './layoutDetector.js';
@@ -12,6 +13,7 @@ export { parseRegisterText } from './registerParser.js';
 export { validateAndDeduplicate } from './registerValidator.js';
 export { detectDocumentType, DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS } from './detection/documentTypeDetector.js';
 export { createDocumentRecord } from './core/documentRecord.js';
+export { checkDREHealth, processWithDRE, verifyDRECell } from './dreClient.js';
 
 /**
  * PURE IN-BROWSER REGISTER SCANNER ENGINE
@@ -127,5 +129,50 @@ export function processScannedDocument(ocrResult, defaultClass = '', existingLea
     duplicates,
     classification: ocrResult?.classification || null,
     record: ocrResult?.record || null,
+  };
+}
+
+/**
+ * Converts Tawi DRE v0.1 backend result into verified candidates & review items
+ */
+export function processDREResult(dreResult, defaultClass = '', existingLearners = []) {
+  const records = dreResult?.records || [];
+  const candidates = records.map((rec) => {
+    const isNeedsReview = rec.verification_required || (rec.composite_confidence < 0.90) || (rec.validation_issues && rec.validation_issues.length > 0);
+    const reviewReason = (rec.validation_issues && rec.validation_issues.length > 0)
+      ? rec.validation_issues.join(' • ')
+      : `DRE Confidence: ${Math.round(rec.composite_confidence * 100)}%`;
+
+    return {
+      name: rec.student_name,
+      admissionNumber: rec.admission_number || (rec.row_index ? String(rec.row_index) : ''),
+      className: defaultClass || 'General',
+      section: '',
+      gender: rec.gender || '',
+      contact: '',
+      totalPresent: rec.total_present,
+      totalAbsent: rec.total_absent,
+      attendanceMarks: rec.attendance_marks || [],
+      keep: true,
+      status: isNeedsReview ? 'needs_review' : 'verified',
+      reviewReason: isNeedsReview ? reviewReason : '',
+      compositeConfidence: Math.round(rec.composite_confidence * 100),
+      isDRERecord: true,
+      rowIndex: rec.row_index,
+    };
+  });
+
+  const { verified, duplicates } = validateAndDeduplicate(candidates, existingLearners);
+
+  return {
+    verified,
+    duplicates,
+    dreResult,
+    classification: {
+      type: dreResult?.document_type || DOCUMENT_TYPES.ATTENDANCE_REGISTER,
+      label: DOCUMENT_TYPE_LABELS[dreResult?.document_type] || 'Attendance Register',
+      confidence: dreResult?.overall_confidence || 0.90,
+      status: 'probable_match',
+    },
   };
 }

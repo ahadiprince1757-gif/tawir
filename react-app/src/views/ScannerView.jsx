@@ -1,6 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createLearner } from '../core/database/schema.js';
-import { recognizeText, processScannedDocument } from '../scanner/scanner.js';
+import {
+  recognizeText,
+  processScannedDocument,
+  checkDREHealth,
+  processWithDRE,
+  processDREResult,
+} from '../scanner/scanner.js';
 import { parseRegisterText } from '../scanner/registerParser.js';
 import { validateAndDeduplicate } from '../scanner/registerValidator.js';
 import { DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS } from '../scanner/detection/documentTypeDetector.js';
@@ -16,18 +22,68 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
   const [previewUrl, setPreviewUrl] = useState(null);
   const [classification, setClassification] = useState(null);
   const [documentRecord, setDocumentRecord] = useState(null);
+  const [dreResult, setDreResult] = useState(null);
+  const [dreStatus, setDreStatus] = useState({ checked: false, online: false });
   const [verifiedCandidates, setVerifiedCandidates] = useState([]);
   const [duplicates, setDuplicates] = useState([]);
 
   const fileInputRef = useRef(null);
+
+  // Probe DRE backend on component mount
+  useEffect(() => {
+    let isMounted = true;
+    checkDREHealth().then((status) => {
+      if (isMounted) {
+        setDreStatus({ checked: true, ...status });
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleSelectImageFile = async (file) => {
     if (!file) return;
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
     setStep('processing');
-    setProgress(10);
+    setProgress(15);
+    setDreResult(null);
+
+    // ── Attempt 1: Tawi DRE Reconstruction Engine (if online) ───────────────
+    if (dreStatus.online) {
+      try {
+        setStatusMessage('Tawi DRE: Uploading & preprocessing document image...');
+        setProgress(30);
+
+        const dResult = await processWithDRE(file);
+        setProgress(70);
+        setStatusMessage('Tawi DRE: Geometric line detection & cell mapping completed...');
+
+        const { verified, duplicates: dups, classification: dClass } = processDREResult(
+          dResult,
+          defaultClass,
+          existingLearners
+        );
+        setProgress(95);
+
+        if (verified.length > 0 || dups.length > 0) {
+          setDreResult(dResult);
+          setClassification(dClass);
+          setVerifiedCandidates(verified);
+          setDuplicates(dups);
+          setStep('review');
+          return;
+        }
+      } catch (dreErr) {
+        console.warn('DRE backend failed, falling back to in-browser engine:', dreErr);
+        if (onToast) onToast('DRE backend unavailable. Using in-browser OCR fallback.');
+      }
+    }
+
+    // ── Attempt 2: In-Browser Pure Client-Side OCR Fallback ──────────────────
     setStatusMessage('Auto-detecting paper boundaries & removing shadows...');
+    setProgress(20);
 
     try {
       const ocrResult = await recognizeText(file, (pct) => {
@@ -153,6 +209,7 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
 
   const keptCount = verifiedCandidates.filter((c) => c.keep && c.name.trim()).length;
   const isExamDoc = classification?.type === 'examination_record';
+  const isDREResult = !!dreResult;
 
   return (
     <section className="view active">
@@ -161,13 +218,42 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
           <div className="eyebrow">Document Scanner</div>
           <h1>Register Scanner</h1>
           <div className="sub">
-            Upload register documents or paste roster text — auto-aligned and digitized in-browser.
+            Upload register documents or paste roster text — auto-aligned and digitized with Tawi DRE.
           </div>
         </div>
       </div>
 
       {step === 'upload' && (
         <div className="panel" style={{ maxWidth: 540, padding: '24px 24px 20px' }}>
+          {/* Tawi DRE Service Status Indicator */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '8px 14px',
+            background: dreStatus.online ? '#eef7ee' : '#f7f8f7',
+            borderRadius: 8,
+            marginBottom: 16,
+            fontSize: 12,
+            border: `1px solid ${dreStatus.online ? '#c8e6c9' : '#e0e0e0'}`,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <span style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: dreStatus.online ? '#2e7d32' : '#9e9e9e',
+                display: 'inline-block',
+              }} />
+              <strong style={{ color: dreStatus.online ? '#1b5e20' : 'var(--ink)' }}>
+                {dreStatus.online ? 'Tawi DRE Backend Active' : 'In-Browser Vision Active'}
+              </strong>
+            </div>
+            <span style={{ color: 'var(--muted)', fontSize: 11 }}>
+              {dreStatus.online ? 'PP-Structure & Deterministic Grid' : 'Pure Client-Side Engine'}
+            </span>
+          </div>
+
           <div style={{ marginBottom: 16 }}>
             <label style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>Target Class / Grade:</label>
             <input
@@ -316,6 +402,20 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
                     {classification.confidence > 0 ? ` (${Math.round(classification.confidence * 100)}%)` : ''}
                   </span>
                 )}
+                {dreResult && (
+                  <span
+                    className="results-badge"
+                    style={{
+                      background: '#e8f5e9',
+                      color: '#1b5e20',
+                      border: '1px solid #c8e6c9',
+                      fontWeight: 600,
+                    }}
+                    title={`Reconstructed ${dreResult.total_cells} cells from ${dreResult.summary?.horizontal_lines_detected || 0} rulings`}
+                  >
+                    DRE Grid: {dreResult.total_cells} cells
+                  </span>
+                )}
               </div>
               <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>
                 Spreadsheet review: Every cell is directly editable. Uncheck any row you wish to exclude.
@@ -370,6 +470,12 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
                       <th style={{ width: '80px', textAlign: 'center' }}>Total</th>
                       <th style={{ width: '70px', textAlign: 'center' }}>Pct</th>
                       <th style={{ width: '60px', textAlign: 'center' }}>Grade</th>
+                    </>
+                  ) : isDREResult ? (
+                    <>
+                      <th style={{ width: '70px', textAlign: 'center' }}>Pres</th>
+                      <th style={{ width: '70px', textAlign: 'center' }}>Abs</th>
+                      <th style={{ width: '110px' }}>Confidence</th>
                     </>
                   ) : (
                     <>
@@ -459,6 +565,43 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
                             />
                           </td>
                         </>
+                      ) : isDREResult ? (
+                        <>
+                          <td style={{ textAlign: 'center' }}>
+                            <input
+                              type="number"
+                              className="scanner-cell-input"
+                              style={{ textAlign: 'center' }}
+                              value={cand.totalPresent ?? ''}
+                              onChange={(e) => handleEditField(idx, 'totalPresent', parseInt(e.target.value, 10) || 0)}
+                            />
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <input
+                              type="number"
+                              className="scanner-cell-input"
+                              style={{ textAlign: 'center' }}
+                              value={cand.totalAbsent ?? ''}
+                              onChange={(e) => handleEditField(idx, 'totalAbsent', parseInt(e.target.value, 10) || 0)}
+                            />
+                          </td>
+                          <td>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                padding: '3px 7px',
+                                borderRadius: 4,
+                                background: cand.status === 'verified' ? '#e8f5e9' : '#fff3e0',
+                                color: cand.status === 'verified' ? '#2e7d32' : '#e65100',
+                                fontWeight: 600,
+                                display: 'inline-block',
+                              }}
+                              title={cand.reviewReason || ''}
+                            >
+                              {cand.compositeConfidence ? `${cand.compositeConfidence}%` : 'DRE'} {cand.status === 'needs_review' ? '(!)' : ''}
+                            </span>
+                          </td>
+                        </>
                       ) : (
                         <>
                           <td>
@@ -497,7 +640,7 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={isExamDoc ? 9 : 8} className="empty">
+                    <td colSpan={isExamDoc ? 9 : isDREResult ? 9 : 8} className="empty">
                       No candidate learners detected. Click "Add Row" or rescan.
                     </td>
                   </tr>
