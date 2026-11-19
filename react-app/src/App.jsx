@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { SchoolMemory } from './core/memory/schoolMemory.js';
 import { createLearner, createEvent } from './core/database/schema.js';
+import { getMockLearners, getMockEvents } from './core/database/mockData.js';
 import { api } from './api.js';
 import './App.css';
 
@@ -33,12 +34,12 @@ export default function App() {
 
   const [learners, setLearners] = useState(() => {
     const saved = localStorage.getItem('school_memory_learners');
-    return saved ? JSON.parse(saved) : DEFAULT_LEARNERS.map(createLearner);
+    return saved && JSON.parse(saved).length > 0 ? JSON.parse(saved) : getMockLearners();
   });
 
   const [events, setEvents] = useState(() => {
     const saved = localStorage.getItem('school_memory_events');
-    return saved ? JSON.parse(saved) : [];
+    return saved && JSON.parse(saved).length > 0 ? JSON.parse(saved) : getMockEvents();
   });
 
   // Calculate unique classes in the school
@@ -267,23 +268,16 @@ export default function App() {
 
   const handleResetSystem = async () => {
     try {
-      const res = await api.resetSystem();
-      if (res && res.learners) {
-        setLearners(res.learners.map(createLearner));
-        setEvents((res.events || []).map(createEvent));
-        localStorage.setItem('school_memory_learners', JSON.stringify(res.learners));
-        localStorage.setItem('school_memory_events', JSON.stringify(res.events || []));
-      } else {
-        setEvents([]);
-        localStorage.removeItem('school_memory_events');
-      }
-      setBackendConnected(true);
-      showToast('System reset to default seed state.');
+      const mockLearners = getMockLearners();
+      const mockEvents = getMockEvents();
+      setLearners(mockLearners);
+      setEvents(mockEvents);
+      localStorage.setItem('school_memory_learners', JSON.stringify(mockLearners));
+      localStorage.setItem('school_memory_events', JSON.stringify(mockEvents));
+      showToast('Loaded demo learners & connected evidence graph!');
     } catch (err) {
       console.warn('Resetting locally:', err.message);
-      setEvents([]);
-      localStorage.removeItem('school_memory_events');
-      showToast('Events erased (offline mode).');
+      showToast('Reset failed: ' + err.message);
     }
   };
 

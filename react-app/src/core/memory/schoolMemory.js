@@ -66,14 +66,15 @@ export class SchoolMemory {
     );
     const officeReferrals = incidentEvents.filter(e => e.action === INCIDENT_ACTIONS.OFFICE_REFERRAL).length;
     const commendations = incidentEvents.filter(e => e.action === INCIDENT_ACTIONS.COMMENDATION).length;
+    const totalDiscipline = incidentEvents.filter(e => e.action === INCIDENT_ACTIONS.DISCIPLINE).length;
 
-    // 5. Recent timeline (last 10 events involving this learner)
+    // 5. Recent timeline (last 15 events involving this learner)
     const recentTimeline = this.events
       .filter(e => e.learnerId === learnerId)
-      .slice(0, 10);
+      .slice(0, 15);
 
-    // 6. Proactive Pattern Insights
-    const patterns = this.detectPatterns(learner, attendance, incompleteWork, officeReferrals);
+    // 6. Proactive Pattern Insights & Connected Evidence
+    const patterns = this.detectPatterns(learner, attendance, incompleteWork, officeReferrals, assessmentEvents, totalDiscipline);
 
     return {
       learner,
@@ -90,6 +91,7 @@ export class SchoolMemory {
         officeReferrals,
         commendations,
         totalIncidents: incidentEvents.length,
+        totalDiscipline,
       },
       recentTimeline,
       patterns,
@@ -97,32 +99,70 @@ export class SchoolMemory {
   }
 
   /**
-   * Discovers actionable patterns (e.g. frequent absences, consecutive missed work)
+   * Discovers actionable patterns & connected evidence
+   * (e.g. declining scores coinciding with attendance drops, repeated conceptual errors)
    */
-  detectPatterns(learner, attendance, incompleteWork, officeReferrals) {
+  detectPatterns(learner, attendance, incompleteWork, officeReferrals, assessmentEvents = [], totalDiscipline = 0) {
     const insights = [];
 
-    // Low attendance alert
+    // 1. Connected Evidence: Academic decline tracking attendance drops
+    if (assessmentEvents.length >= 2) {
+      const sortedAssessments = [...assessmentEvents].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      const firstScore = sortedAssessments[0]?.value?.percentage ?? (sortedAssessments[0]?.value?.score / (sortedAssessments[0]?.value?.outOf || 100) * 100);
+      const latestScore = sortedAssessments[sortedAssessments.length - 1]?.value?.percentage ?? (sortedAssessments[sortedAssessments.length - 1]?.value?.score / (sortedAssessments[sortedAssessments.length - 1]?.value?.outOf || 100) * 100);
+
+      if (firstScore !== undefined && latestScore !== undefined && (firstScore - latestScore) >= 15) {
+        if (attendance.daysAbsent >= 3) {
+          insights.push({
+            severity: 'warning',
+            title: 'Connected Evidence: Performance Fall & Attendance Drop',
+            description: `Assessment performance dropped from ${Math.round(firstScore)}% down to ${Math.round(latestScore)}%, coinciding with ${attendance.daysAbsent} absences and ${totalDiscipline + officeReferrals} recorded incident(s).`,
+          });
+        } else {
+          insights.push({
+            severity: 'warning',
+            title: 'Noticeable Performance Decline',
+            description: `Assessment scores have fallen from ${Math.round(firstScore)}% down to ${Math.round(latestScore)}% over recent evaluation rounds.`,
+          });
+        }
+      }
+    }
+
+    // 2. Specific Learning / Conceptual Errors (e.g., place value)
+    const errorTags = assessmentEvents.map(e => e.metadata?.errorTag).filter(Boolean);
+    if (errorTags.some(t => t.includes('place_value'))) {
+      insights.push({
+        severity: 'attention',
+        title: 'Targeted Conceptual Obstacle: Place Value',
+        description: 'Repeated difficulty recorded in place value and 2-digit regrouping (addition carrying / subtraction borrowing). Concrete manipulatives recommended.',
+      });
+    }
+
+    // 3. Low attendance alert
     if (attendance.totalSchoolDays >= 3 && attendance.percentage < 85) {
       insights.push({
         severity: 'warning',
-        title: 'Attendance Needs Attention',
-        description: `Current attendance is ${attendance.percentage}% (${attendance.daysAbsent} days absent out of ${attendance.totalSchoolDays} school days).`,
+        title: 'Attendance Below Threshold',
+        description: `Current attendance is ${attendance.percentage}% (${attendance.daysAbsent} days absent out of ${attendance.totalSchoolDays} school days recorded).`,
       });
     }
 
-    // Recent streak of absences
-    const recentDays = attendance.history.slice(0, 5);
-    const recentAbsences = recentDays.filter(d => d.isAbsent).length;
-    if (recentAbsences >= 2) {
+    // 4. Day-of-week pattern (e.g., Friday absenteeism)
+    const absentEvents = this.events.filter(e => e.type === EVENT_TYPES.ATTENDANCE && e.action === 'absent' && e.learnerId === learner.id);
+    const fridayCount = absentEvents.filter(e => {
+      const d = new Date(e.date);
+      return !isNaN(d) && d.getDay() === 5; // Friday
+    }).length;
+
+    if (fridayCount >= 3) {
       insights.push({
         severity: 'attention',
-        title: 'Recent Absence Cluster',
-        description: `Absent ${recentAbsences} times in the last ${recentDays.length} recorded school days.`,
+        title: 'Recurring Friday Absenteeism',
+        description: `Student has missed school on ${fridayCount} Fridays. Consider engaging the parent regarding end-of-week routine.`,
       });
     }
 
-    // Incomplete work alert
+    // 5. Incomplete work alert
     if (incompleteWork >= 2) {
       insights.push({
         severity: 'warning',
@@ -131,21 +171,21 @@ export class SchoolMemory {
       });
     }
 
-    // Behaviour check
-    if (officeReferrals >= 2) {
+    // 6. Behaviour check
+    if (officeReferrals >= 1 || totalDiscipline >= 2) {
       insights.push({
         severity: 'warning',
-        title: 'Repeated Office Referrals',
-        description: `${officeReferrals} office referrals on record. Consider a pastoral check-in.`,
+        title: 'Classroom Conduct & Focus Check',
+        description: `${officeReferrals} referral(s) and ${totalDiscipline} behavioral note(s) logged. Pastoral conversation recommended.`,
       });
     }
 
-    // Commendation praise
-    if (attendance.totalSchoolDays >= 5 && attendance.percentage === 100) {
+    // 7. Commendation praise
+    if (attendance.totalSchoolDays >= 3 && attendance.percentage === 100) {
       insights.push({
         severity: 'good',
-        title: 'Perfect Attendance',
-        description: `100% attendance across all ${attendance.totalSchoolDays} recorded school days!`,
+        title: 'Flawless Attendance',
+        description: `100% attendance maintained across all ${attendance.totalSchoolDays} recorded school sessions!`,
       });
     }
 

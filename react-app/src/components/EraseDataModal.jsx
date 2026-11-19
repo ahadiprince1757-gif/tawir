@@ -49,22 +49,22 @@ export default function EraseDataModal({ isOpen, onClose, onClearAllEvents, onRe
 
           <div className="erase-option-card" style={{ marginTop: 14 }}>
             <div className="erase-option-info">
-              <div className="erase-option-title">Reset System to Seed State</div>
+              <div className="erase-option-title">Load Demonstration Evidence Dataset</div>
               <div className="erase-option-desc">
-                Restores the standard 100-student directory and default setup, removing any test imports from the register scanner.
+                Loads realistic Kenya PP1-Grade 4 learner cases: Brian Mwangi (performance drop & attendance correlation), Amina Hassan (targeted place-value difficulties), Kevin Kiprono (recurring Friday absences), and Faith Muthoni (100% attendance).
               </div>
             </div>
             <button
               className="erase-action-btn erase-btn-secondary"
               onClick={() => {
-                if (window.confirm('Reset the entire system back to pristine seed data?')) {
+                if (window.confirm('Populate Tawi with demonstration learner profiles and connected evidence records?')) {
                   onResetSystem();
                   onClose();
                 }
               }}
             >
               <RotateCcwIcon size={13} />
-              <span>Reset to Seed State</span>
+              <span>Load Demo Data</span>
             </button>
           </div>
         </div>

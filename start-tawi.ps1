@@ -1,4 +1,4 @@
-﻿# ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 # Tawi — Concurrent Dev Startup
 # Starts the DRE backend (FastAPI) and React frontend in separate terminals.
 #
