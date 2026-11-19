@@ -133,33 +133,67 @@ export function processScannedDocument(ocrResult, defaultClass = '', existingLea
 }
 
 /**
- * Converts Tawi DRE v0.1 backend result into verified candidates & review items
+ * Converts Tawi DRE backend result into verified candidates for the review table.
+ * Handles BOTH attendance registers and examination marksheets.
  */
 export function processDREResult(dreResult, defaultClass = '', existingLearners = []) {
   const records = dreResult?.records || [];
-  const candidates = records.map((rec) => {
-    const isNeedsReview = rec.verification_required || (rec.composite_confidence < 0.90) || (rec.validation_issues && rec.validation_issues.length > 0);
-    const reviewReason = (rec.validation_issues && rec.validation_issues.length > 0)
-      ? rec.validation_issues.join(' • ')
-      : `DRE Confidence: ${Math.round(rec.composite_confidence * 100)}%`;
+  const docType = dreResult?.document_type || 'attendance_register';
+  const isExam = docType === 'examination_record';
 
-    return {
-      name: rec.student_name,
-      admissionNumber: rec.admission_number || (rec.row_index ? String(rec.row_index) : ''),
+  const candidates = records.map((rec) => {
+    const isNeedsReview =
+      rec.verification_required ||
+      rec.composite_confidence < 0.90 ||
+      (rec.validation_issues && rec.validation_issues.length > 0);
+
+    const reviewReason =
+      rec.validation_issues?.length > 0
+        ? rec.validation_issues.join(' • ')
+        : `DRE ${Math.round(rec.composite_confidence * 100)}%`;
+
+    const base = {
+      name: rec.student_name || '',
+      admissionNumber: rec.admission_number || String(rec.row_index || ''),
       className: defaultClass || 'General',
       section: '',
       gender: rec.gender || '',
       contact: '',
-      totalPresent: rec.total_present,
-      totalAbsent: rec.total_absent,
-      attendanceMarks: rec.attendance_marks || [],
       keep: true,
       status: isNeedsReview ? 'needs_review' : 'verified',
       reviewReason: isNeedsReview ? reviewReason : '',
       compositeConfidence: Math.round(rec.composite_confidence * 100),
       isDRERecord: true,
+      isExamRecord: isExam,
       rowIndex: rec.row_index,
       nameSnippet: rec.name_snippet_base64 || null,
+    };
+
+    if (isExam) {
+      return {
+        ...base,
+        subjectScores: rec.subject_scores || [],
+        // -1 = ink detected, value unread — teacher confirms during review
+        totalMarks: rec.total_marks ?? null,
+        percentage: rec.percentage ?? null,
+        grade: rec.grade || '',
+        remarks: rec.remarks || '',
+        // Not used for exam records
+        totalPresent: 0,
+        totalAbsent: 0,
+        attendanceMarks: [],
+      };
+    }
+
+    return {
+      ...base,
+      totalPresent: rec.total_present || 0,
+      totalAbsent: rec.total_absent || 0,
+      attendanceMarks: rec.attendance_marks || [],
+      subjectScores: [],
+      totalMarks: null,
+      percentage: null,
+      grade: '',
     };
   });
 
@@ -170,9 +204,9 @@ export function processDREResult(dreResult, defaultClass = '', existingLearners 
     duplicates,
     dreResult,
     classification: {
-      type: dreResult?.document_type || DOCUMENT_TYPES.ATTENDANCE_REGISTER,
-      label: DOCUMENT_TYPE_LABELS[dreResult?.document_type] || 'Attendance Register',
-      confidence: dreResult?.overall_confidence || 0.90,
+      type: docType,
+      label: isExam ? 'Examination Marksheet' : 'Attendance Register',
+      confidence: dreResult?.overall_confidence || 0.88,
       status: 'probable_match',
     },
   };

@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class DocumentType(str, Enum):
     UNKNOWN = "unknown"
     ATTENDANCE_REGISTER = "attendance_register"
+    EXAMINATION_RECORD = "examination_record"
     ADMISSION_REGISTER = "admission_register"
     MARKS_REGISTER = "marks_register"
     FEE_REGISTER = "fee_register"
@@ -82,15 +83,31 @@ class AttendanceDayRecord(BaseModel):
     verification_required: bool = False
 
 
+class SubjectScore(BaseModel):
+    """A single subject score extracted from an exam marksheet."""
+    subject: str
+    score: Optional[float] = None   # -1.0 = ink detected, value unread (teacher confirms)
+    max_score: Optional[float] = None
+
+
 class StudentRecord(BaseModel):
     row_index: int
     admission_number: Optional[str] = None
     student_name: str
     gender: Optional[str] = None
     name_snippet_base64: Optional[str] = None
+    # Attendance fields
     attendance_marks: List[AttendanceDayRecord] = Field(default_factory=list)
     total_present: int = 0
     total_absent: int = 0
+    # Exam / Assessment fields
+    subject_scores: List[SubjectScore] = Field(default_factory=list)
+    total_marks: Optional[float] = None
+    max_marks: Optional[float] = None
+    percentage: Optional[float] = None
+    grade: Optional[str] = None
+    remarks: Optional[str] = None
+    # Confidence & validation
     composite_confidence: float = 0.0
     verification_required: bool = False
     validation_issues: List[str] = Field(default_factory=list)

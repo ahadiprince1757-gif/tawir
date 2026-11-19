@@ -156,14 +156,23 @@ export default function App() {
     }
   };
 
-  const handleImportLearners = async (newLearners) => {
+  const handleImportLearners = async (newLearners, newEvents = []) => {
     setLearners((prev) => [...prev, ...newLearners]);
+
+    // Wire scanned events (attendance absences, exam scores) into school memory
+    if (newEvents && newEvents.length > 0) {
+      setEvents((prev) => [...newEvents, ...prev]);
+    }
 
     try {
       await api.addLearners(newLearners);
+      if (newEvents && newEvents.length > 0) {
+        // Push events to backend if connected (best-effort)
+        await Promise.allSettled(newEvents.map((ev) => api.createEvent(ev)));
+      }
       setBackendConnected(true);
     } catch (err) {
-      console.warn('Learners saved locally:', err.message);
+      console.warn('Learners/events saved locally:', err.message);
     }
   };
 

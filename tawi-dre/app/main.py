@@ -35,6 +35,57 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 RESULTS_STORE = {}
 
 
+def _infer_document_type(image_path: str, filename: str) -> DocumentType:
+    """
+    Auto-detect document type from filename keywords, then image structure.
+    Attendance registers: very dense horizontal lines (40+ rows).
+    Exam marksheets: moderate rows + multiple vertical column rulings.
+    """
+    import cv2
+    import numpy as np
+
+    fname_lower = filename.lower()
+    if any(k in fname_lower for k in ["mark", "exam", "result", "score", "grade", "sheet"]):
+        return DocumentType.EXAMINATION_RECORD
+    if any(k in fname_lower for k in ["attend", "register", "roll", "class"]):
+        return DocumentType.ATTENDANCE_REGISTER
+
+    try:
+        img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+        if img is None:
+            return DocumentType.ATTENDANCE_REGISTER
+
+        h, w = img.shape
+        binary = cv2.adaptiveThreshold(
+            img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 25, 7
+        )
+
+        # Count long horizontal rulings
+        h_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (max(20, int(w * 0.30)), 1))
+        h_lines = cv2.morphologyEx(binary, cv2.MORPH_OPEN, h_kernel)
+        h_line_count = int(np.sum(np.sum(h_lines, axis=1) > w * 40))
+
+        # Count long vertical rulings
+        v_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, max(10, int(h * 0.25))))
+        v_lines = cv2.morphologyEx(binary, cv2.MORPH_OPEN, v_kernel)
+        v_line_count = int(np.sum(np.sum(v_lines, axis=0) > h * 30))
+
+        logger.info(f"Auto-detect heuristic: h_lines={h_line_count}, v_lines={v_line_count}")
+
+        # Attendance registers: 30+ horizontal lines, few vertical ones
+        if h_line_count >= 30 and v_line_count < 8:
+            return DocumentType.ATTENDANCE_REGISTER
+        # Exam marksheets: moderate rows + 6+ vertical column separators
+        if v_line_count >= 6:
+            return DocumentType.EXAMINATION_RECORD
+
+        return DocumentType.ATTENDANCE_REGISTER
+
+    except Exception as exc:
+        logger.warning(f"Auto-detect failed ({exc}), defaulting to ATTENDANCE_REGISTER")
+        return DocumentType.ATTENDANCE_REGISTER
+
+
 @app.get("/health")
 def health():
     return {
@@ -48,12 +99,12 @@ def health():
 @app.post("/documents/process", response_model=DocumentProcessingResult)
 async def process_document(
     file: UploadFile = File(...),
-    document_type: DocumentType = Form(DocumentType.ATTENDANCE_REGISTER)
+    document_type: DocumentType = Form(DocumentType.UNKNOWN)
 ):
     """
-    Process an uploaded register photograph through the Tawi DRE pipeline:
-    Reconstructs grid rulings, maps cells, extracts student rows & marks,
-    evaluates mathematical consistency and returns verified record objects.
+    Process an uploaded register photograph through the Tawi DRE pipeline.
+    If document_type is UNKNOWN (default), auto-detects from filename + image heuristics.
+    Supports: ATTENDANCE_REGISTER and EXAMINATION_RECORD.
     """
     document_id = str(uuid.uuid4())
     suffix = Path(file.filename or "register.jpg").suffix or ".jpg"
@@ -64,10 +115,14 @@ async def process_document(
             shutil.copyfileobj(file.file, buffer)
 
         logger.info(f"Saved uploaded register to {temp_path}")
-        result = engine.process(str(temp_path), doc_type=document_type)
-        result.document_id = document_id
 
-        # Cache in results store for human verification review
+        inferred_type = document_type
+        if document_type == DocumentType.UNKNOWN:
+            inferred_type = _infer_document_type(str(temp_path), file.filename or "")
+            logger.info(f"Auto-detected document type: {inferred_type}")
+
+        result = engine.process(str(temp_path), doc_type=inferred_type)
+        result.document_id = document_id
         RESULTS_STORE[document_id] = result
         return result
 

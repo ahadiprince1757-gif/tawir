@@ -94,6 +94,31 @@ class TawiDRE:
                 summary=summary
             )
 
+        # ── Examination Record (Printed Marksheet) Reconstruction ────────────
+        if doc_type == DocumentType.EXAMINATION_RECORD:
+            from app.reconstruction.exam_analyzer import analyze_exam_register
+            records, cells, summary = analyze_exam_register(raw_image)
+
+            overall_conf = (
+                sum(r.composite_confidence for r in records) / len(records)
+                if records else 0.80
+            )
+
+            return DocumentProcessingResult(
+                document_id=doc_id,
+                document_type=doc_type,
+                image_width=w,
+                image_height=h,
+                total_rows=len(records),
+                total_columns=summary.get("total_columns_detected", 11),
+                total_cells=len(records),
+                cells=cells,
+                records=records,
+                overall_confidence=round(overall_conf, 4),
+                verification_required=(overall_conf < 0.90),
+                summary=summary
+            )
+
         # 2. Geometric Line Detection (for marks registers / general forms)
         horizontal_lines, vertical_lines = detect_lines(image)
 
