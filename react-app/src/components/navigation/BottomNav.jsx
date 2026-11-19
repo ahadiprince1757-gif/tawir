@@ -1,7 +1,9 @@
 import React from 'react';
-import { CalendarIcon, UsersIcon, FileTextIcon, CameraIcon } from '../../Icons.jsx';
+import { CalendarIcon, UsersIcon, FileTextIcon } from '../../Icons.jsx';
 
-export default function BottomNav({ view, onNavigate, learnerCount }) {
+export default function BottomNav({ view, onNavigate, learnerCount, currentUser }) {
+  const isHeadteacher = currentUser?.role === 'headteacher';
+
   return (
     <nav className="bottom-nav">
       <button 
@@ -11,7 +13,9 @@ export default function BottomNav({ view, onNavigate, learnerCount }) {
         <span className="bottom-nav-icon">
           <CalendarIcon size={20} />
         </span>
-        <span className="bottom-nav-label">Today</span>
+        <span className="bottom-nav-label">
+          {currentUser?.role === 'teacher' ? 'My Class' : 'School'}
+        </span>
       </button>
 
       <button 
@@ -26,24 +30,26 @@ export default function BottomNav({ view, onNavigate, learnerCount }) {
       </button>
 
       <button 
-        className={`bottom-nav-btn ${view === 'timeline' ? 'active' : ''}`}
-        onClick={() => onNavigate('timeline')}
+        className={`bottom-nav-btn ${view === 'smartsheet' ? 'active' : ''}`}
+        onClick={() => onNavigate('smartsheet')}
       >
         <span className="bottom-nav-icon">
           <FileTextIcon size={20} />
         </span>
-        <span className="bottom-nav-label">Log</span>
+        <span className="bottom-nav-label">Smart Sheet</span>
       </button>
 
-      <button 
-        className={`bottom-nav-btn ${view === 'scanner' ? 'active' : ''}`}
-        onClick={() => onNavigate('scanner')}
-      >
-        <span className="bottom-nav-icon">
-          <CameraIcon size={20} />
-        </span>
-        <span className="bottom-nav-label">Scanner</span>
-      </button>
+      {isHeadteacher && (
+        <button 
+          className={`bottom-nav-btn ${view === 'timeline' ? 'active' : ''}`}
+          onClick={() => onNavigate('timeline')}
+        >
+          <span className="bottom-nav-icon">
+            <span style={{ fontSize: 16 }}>📋</span>
+          </span>
+          <span className="bottom-nav-label">Records</span>
+        </button>
+      )}
     </nav>
   );
 }

@@ -21,6 +21,7 @@ import LoginView from './views/LoginView.jsx';
 import TodayView from './views/TodayView.jsx';
 import LearnersView from './views/LearnersView.jsx';
 import EventTimelineView from './views/EventTimelineView.jsx';
+import SmartSheetView from './views/SmartSheetView.jsx';
 import ScannerView from './views/ScannerView.jsx';
 
 export default function App() {
@@ -334,6 +335,7 @@ export default function App() {
             onToggleAttendance={handleToggleAttendance}
             onSelectLearner={(id) => setSelectedLearnerId(id)}
             onToast={showToast}
+            onNavigate={setView}
           />
         )}
 
@@ -362,6 +364,17 @@ export default function App() {
           />
         )}
 
+        {view === 'smartsheet' && (
+          <SmartSheetView
+            existingLearners={scopedLearners}
+            currentUser={currentUser}
+            onImportRecords={handleImportLearners}
+            onToast={showToast}
+            onNavigate={setView}
+          />
+        )}
+
+        {/* Deprecated/Hidden Scanner preserved as experimental */}
         {view === 'scanner' && (
           <ScannerView
             existingLearners={learners}
@@ -376,6 +389,7 @@ export default function App() {
         view={view}
         onNavigate={setView}
         learnerCount={scopedLearners.length}
+        currentUser={currentUser}
       />
 
       {selectedLearnerId && (

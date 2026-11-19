@@ -88,17 +88,19 @@ export default function Sidebar({
       {/* Nav */}
       <nav>
         <button className={view === 'today' ? 'active' : ''} onClick={() => onNavigate('today')}>
-          Today
+          {currentUser?.role === 'teacher' ? 'My Class' : 'School'}
         </button>
         <button className={view === 'learners' ? 'active' : ''} onClick={() => onNavigate('learners')}>
           Learners ({learnerCount})
         </button>
-        <button className={view === 'timeline' ? 'active' : ''} onClick={() => onNavigate('timeline')}>
-          Event Log
+        <button className={view === 'smartsheet' ? 'active' : ''} onClick={() => onNavigate('smartsheet')}>
+          Smart Sheet
         </button>
-        <button className={view === 'scanner' ? 'active' : ''} onClick={() => onNavigate('scanner')}>
-          Scan Register
-        </button>
+        {currentUser?.role === 'headteacher' && (
+          <button className={view === 'timeline' ? 'active' : ''} onClick={() => onNavigate('timeline')}>
+            Records (Log)
+          </button>
+        )}
       </nav>
 
       {/* Erase — headteacher only */}

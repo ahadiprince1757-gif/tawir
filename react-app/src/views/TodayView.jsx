@@ -1,19 +1,30 @@
 import React, { useState, useMemo } from 'react';
 import WhatHappenedComposer from '../components/WhatHappenedComposer.jsx';
-import { todayDateKey, todayDateLabel } from '../utils/formatters.js';
+import AddRecordModal from '../components/AddRecordModal.jsx';
+import { todayDateKey, todayDateLabel, timeLabel } from '../utils/formatters.js';
 
 export default function TodayView({
   schoolMemory,
   learners,
   events,
+  currentUser,
   onCommitEvent,
   onToggleAttendance,
   onSelectLearner,
   onToast,
+  onNavigate,
 }) {
+  const isTeacher = currentUser?.role === 'teacher';
   const todayKey = todayDateKey();
-  const [activeFilter, setActiveFilter] = useState('absent'); // 'absent' | 'all' | 'present' | null
+
+  // Teacher Quick Modal State
+  const [isAddRecordOpen, setIsAddRecordOpen] = useState(false);
+  const [recordInitialType, setRecordInitialType] = useState('observation');
+
+  // Attendance & Filtering State
   const [searchFilter, setSearchFilter] = useState('');
+  const [attendanceRollOpen, setAttendanceRollOpen] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('absent'); // 'absent' | 'all' | 'present' | null
   const [selectedClass, setSelectedClass] = useState('ALL');
 
   const dailyBriefing = useMemo(
@@ -27,7 +38,7 @@ export default function TodayView({
     return map;
   }, [learners]);
 
-  // Unique classes for filtering
+  // Unique classes for Headteacher view
   const classesList = useMemo(() => {
     const set = new Set();
     learners.forEach((l) => {
@@ -36,114 +47,397 @@ export default function TodayView({
     return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   }, [learners]);
 
-  // List of absent learners
-  const absentLearners = useMemo(() => {
-    return dailyBriefing.absentLearnerIds
-      .map((id) => learnerMap.get(id))
-      .filter(Boolean);
-  }, [dailyBriefing.absentLearnerIds, learnerMap]);
-
-  // List of present learners
-  const presentLearners = useMemo(() => {
-    const absentSet = new Set(dailyBriefing.absentLearnerIds);
-    return learners.filter((l) => !absentSet.has(l.id));
-  }, [learners, dailyBriefing.absentLearnerIds]);
-
-  // Filtered list based on clicked card + class selector + search query
-  const displayedLearners = useMemo(() => {
-    let list = [];
-    if (activeFilter === 'absent') list = absentLearners;
-    else if (activeFilter === 'present') list = presentLearners;
-    else if (activeFilter === 'all') list = learners;
-
-    // Filter by class if selected
-    if (selectedClass !== 'ALL') {
-      list = list.filter((l) => l.className === selectedClass);
-    }
-
-    if (!searchFilter.trim()) return list;
+  // Filtered learners in My Class
+  const filteredClassLearners = useMemo(() => {
+    if (!searchFilter.trim()) return learners;
     const q = searchFilter.toLowerCase().trim();
-    return list.filter(
+    return learners.filter(
       (l) =>
         (l.fullName || '').toLowerCase().includes(q) ||
-        String(l.admissionNumber || '').toLowerCase().includes(q) ||
-        (l.className || '').toLowerCase().includes(q) ||
-        (l.guardianName || '').toLowerCase().includes(q)
+        String(l.admissionNumber || '').toLowerCase().includes(q)
     );
-  }, [activeFilter, absentLearners, presentLearners, learners, selectedClass, searchFilter]);
+  }, [learners, searchFilter]);
 
+  // Recent events for this class or school
+  const recentEvents = useMemo(() => {
+    return (events || []).slice(0, 8);
+  }, [events]);
+
+  const handleOpenAddRecord = (type = 'observation') => {
+    setRecordInitialType(type);
+    setIsAddRecordOpen(true);
+  };
+
+  // ═════════════════════════════════════════════════════════════════════════════
+  // 1. TEACHER SURFACE: "MY CLASS" (Clean, operational, no analytics clutter)
+  // ═════════════════════════════════════════════════════════════════════════════
+  if (isTeacher) {
+    return (
+      <section className="view active">
+        {/* Minimal Class Header */}
+        <div className="page-head" style={{ marginBottom: 20 }}>
+          <div>
+            <div className="eyebrow">Classroom Workbench</div>
+            <h1 style={{ fontSize: 26, fontWeight: 800 }}>{currentUser.className || 'My Class'}</h1>
+            <div className="sub" style={{ fontSize: 14 }}>
+              {learners.length} registered learners • Teacher: {currentUser.name}
+            </div>
+          </div>
+          <div className="date">{todayDateLabel()}</div>
+        </div>
+
+        {/* ── 4 Quick Primary Action Buttons ─────────────────────────────────── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 24 }}>
+          <button
+            onClick={() => setAttendanceRollOpen(!attendanceRollOpen)}
+            style={{
+              padding: '12px 14px',
+              borderRadius: 12,
+              border: attendanceRollOpen ? '2px solid var(--ink)' : '1.5px solid var(--border)',
+              background: attendanceRollOpen ? 'var(--ink)' : 'var(--surface)',
+              color: attendanceRollOpen ? '#fff' : 'var(--ink)',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+              textAlign: 'left',
+            }}
+          >
+            <span>Attendance</span>
+            <small style={{ fontWeight: 400, opacity: 0.85, fontSize: 11 }}>
+              {dailyBriefing.absent > 0 ? `${dailyBriefing.absent} marked absent` : 'Mark roll call'}
+            </small>
+          </button>
+
+          <button
+            onClick={() => onNavigate && onNavigate('smartsheet')}
+            style={{
+              padding: '12px 14px',
+              borderRadius: 12,
+              border: '1.5px solid var(--border)',
+              background: 'var(--surface)',
+              color: 'var(--ink)',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+              textAlign: 'left',
+            }}
+          >
+            <span>Assessment</span>
+            <small style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11 }}>
+              Enter marks & tests
+            </small>
+          </button>
+
+          <button
+            onClick={() => handleOpenAddRecord('learning_difficulty')}
+            style={{
+              padding: '12px 14px',
+              borderRadius: 12,
+              border: '1.5px solid var(--border)',
+              background: 'var(--surface)',
+              color: 'var(--ink)',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+              textAlign: 'left',
+            }}
+          >
+            <span>Learning Mistake</span>
+            <small style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11 }}>
+              Tag skill / concept error
+            </small>
+          </button>
+
+          <button
+            onClick={() => handleOpenAddRecord('observation')}
+            style={{
+              padding: '12px 14px',
+              borderRadius: 12,
+              border: '1.5px solid var(--border)',
+              background: 'var(--surface)',
+              color: 'var(--ink)',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+              textAlign: 'left',
+            }}
+          >
+            <span>Add Observation</span>
+            <small style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11 }}>
+              Note progress or behaviour
+            </small>
+          </button>
+        </div>
+
+        {/* ── Optional Quick Attendance Checklist Drawer ──────────────────────── */}
+        {attendanceRollOpen && (
+          <div className="panel" style={{ marginBottom: 24, padding: '16px 20px', border: '2px solid var(--ink)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div>
+                <strong style={{ fontSize: 15 }}>Today's Roll Call ({todayDateLabel()})</strong>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  Presence is default. Tap any learner to toggle absent.
+                </div>
+              </div>
+              <button
+                className="secondary"
+                style={{ padding: '4px 10px', fontSize: 11 }}
+                onClick={() => setAttendanceRollOpen(false)}
+              >
+                Close Roll Call
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+              {learners.map((learner) => {
+                const isAbsent = dailyBriefing.absentLearnerIds.includes(learner.id);
+                return (
+                  <div
+                    key={learner.id}
+                    onClick={() => onToggleAttendance(todayKey, learner.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      border: isAbsent ? '1.5px solid #dc2626' : '1px solid var(--border)',
+                      background: isAbsent ? '#fef2f2' : 'var(--surface)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div>
+                      <strong style={{ fontSize: 13, color: isAbsent ? '#991b1b' : 'var(--ink)' }}>
+                        {learner.fullName}
+                      </strong>
+                      {learner.admissionNumber && (
+                        <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 6 }}>
+                          #{learner.admissionNumber}
+                        </span>
+                      )}
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        background: isAbsent ? '#dc2626' : 'var(--good)',
+                        color: '#fff',
+                      }}
+                    >
+                      {isAbsent ? 'ABSENT' : 'PRESENT'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── My Class Roster (Clean, searchable, tap to view dossier) ────────── */}
+        <div className="panel" style={{ padding: 0, overflow: 'hidden', marginBottom: 24 }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 16 }}>Class Learners ({learners.length})</h3>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                Click any learner to view their complete dossier & evidence history
+              </div>
+            </div>
+            <input
+              type="text"
+              placeholder="Search learner..."
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              className="search"
+              style={{ width: 180, padding: '6px 12px', fontSize: 13 }}
+            />
+          </div>
+
+          <div className="table-responsive">
+            <table className="sheet-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '40px', textAlign: 'center' }}>#</th>
+                  <th>Learner Name</th>
+                  <th>Adm No</th>
+                  <th>Gender</th>
+                  <th>Guardian</th>
+                  <th style={{ textAlign: 'right' }}>Today's Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredClassLearners.map((learner, idx) => {
+                  const isAbsent = dailyBriefing.absentLearnerIds.includes(learner.id);
+                  return (
+                    <tr
+                      key={learner.id}
+                      className="sheet-row"
+                      onClick={() => onSelectLearner(learner.id)}
+                      title="Click to view complete learner memory"
+                    >
+                      <td style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 11 }}>
+                        {idx + 1}
+                      </td>
+                      <td className="sheet-name-cell">
+                        <strong>{learner.fullName}</strong>
+                      </td>
+                      <td>
+                        <span className="sheet-adm">{learner.admissionNumber || '—'}</span>
+                      </td>
+                      <td>{learner.gender || '—'}</td>
+                      <td>
+                        <span className="sheet-guardian">{learner.guardianName || '—'}</span>
+                      </td>
+                      <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          className={`mini-toggle-btn ${isAbsent ? 'toggle-absent' : 'toggle-present'}`}
+                          onClick={() => onToggleAttendance(todayKey, learner.id)}
+                        >
+                          {isAbsent ? 'Absent' : 'Present'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ── Recent Class Activity ───────────────────────────────────────────── */}
+        <div className="panel" style={{ padding: '16px 20px' }}>
+          <h4 style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--ink)' }}>Recent Activity</h4>
+          {recentEvents.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {recentEvents.map(ev => {
+                const learner = ev.learnerId ? learnerMap.get(ev.learnerId) : null;
+                return (
+                  <div
+                    key={ev.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: 13,
+                      padding: '6px 0',
+                      borderBottom: '1px solid var(--line)',
+                    }}
+                  >
+                    <div>
+                      <span className="tag" style={{ marginRight: 8, fontSize: 10 }}>{ev.type}</span>
+                      <strong>{learner ? learner.fullName : 'Class-wide'}</strong>
+                      <span style={{ color: 'var(--muted)', marginLeft: 6 }}>
+                        {ev.source || ev.action}
+                      </span>
+                    </div>
+                    <small style={{ color: 'var(--muted)' }}>{timeLabel(ev.createdAt)}</small>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ color: 'var(--muted)', fontSize: 12 }}>No activity recorded yet today.</div>
+          )}
+        </div>
+
+        {/* Modal: Add Record / Add Observation */}
+        <AddRecordModal
+          isOpen={isAddRecordOpen}
+          onClose={() => setIsAddRecordOpen(false)}
+          learners={learners}
+          currentUser={currentUser}
+          onCommitEvent={onCommitEvent}
+          onToast={onToast}
+          initialType={recordInitialType}
+        />
+      </section>
+    );
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════════
+  // 2. HEADTEACHER SURFACE: "SCHOOL" (Full overview, absentee tracking, search)
+  // ═════════════════════════════════════════════════════════════════════════════
   return (
     <section className="view active">
       <div className="top">
         <div>
-          <div className="eyebrow">Tawir • School Operating Memory</div>
-          <h1>Today</h1>
+          <div className="eyebrow">Tawi • School Operating Memory</div>
+          <h1>School Overview</h1>
           <div className="sub">
-            Presence is the default state. Click any card below to view details or filter.
+            All classes, absentee monitoring, and cross-referenced learner memory.
           </div>
         </div>
         <div className="date">{todayDateLabel()}</div>
       </div>
 
-      {/* Interactive Stat Cards - Click to filter */}
+      {/* Headteacher Stats Bar */}
       <div className="stats" style={{ marginBottom: 20 }}>
-        <div 
+        <div
           className={`stat stat-interactive ${activeFilter === 'all' ? 'stat-active' : ''}`}
           onClick={() => setActiveFilter(activeFilter === 'all' ? null : 'all')}
-          title="Click to view all registered learners"
         >
           <div className="n">{dailyBriefing.total}</div>
-          <div className="l">Registered ▾</div>
+          <div className="l">Total Registered ▾</div>
         </div>
 
-        <div 
+        <div
           className={`stat stat-interactive ${activeFilter === 'present' ? 'stat-active' : ''}`}
           onClick={() => setActiveFilter(activeFilter === 'present' ? null : 'present')}
-          title="Click to view present learners"
         >
           <div className="n present-n">{dailyBriefing.present}</div>
           <div className="l">Present (Derived) ▾</div>
         </div>
 
-        <div 
+        <div
           className={`stat stat-interactive ${activeFilter === 'absent' ? 'stat-active' : ''}`}
           onClick={() => setActiveFilter(activeFilter === 'absent' ? null : 'absent')}
-          title="Click to view today's absentees"
         >
           <div className="n absent-n">{dailyBriefing.absent}</div>
-          <div className="l">Absent ▾</div>
+          <div className="l">Absent Today ▾</div>
         </div>
 
         <div className="stat">
           <div className="n">{dailyBriefing.attendanceRate}%</div>
-          <div className="l">Attendance Rate</div>
+          <div className="l">School Rate</div>
         </div>
       </div>
 
-      {/* Prominent Natural Language Input */}
+      {/* Natural Language Composer */}
       <WhatHappenedComposer
         schoolMemory={schoolMemory}
         onCommitEvent={onCommitEvent}
         onToast={onToast}
       />
 
-      {/* Clean Collapsible Details Dropdown / Panel */}
+      {/* Class & Learner Inspector */}
       {activeFilter && (
         <div className="panel" style={{ marginTop: 20, padding: 0, overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--line)', flexWrap: 'wrap', gap: 10 }}>
             <div>
-              <h2 style={{ margin: 0 }}>
-                {activeFilter === 'absent' && `Today's Absentees (${absentLearners.length})`}
-                {activeFilter === 'present' && `Present Learners (${presentLearners.length})`}
-                {activeFilter === 'all' && `All Learners (${learners.length})`}
+              <h2 style={{ margin: 0, fontSize: 16 }}>
+                {activeFilter === 'absent' && `Today's Absentees Across School (${dailyBriefing.absent})`}
+                {activeFilter === 'present' && `Present Learners (${dailyBriefing.present})`}
+                {activeFilter === 'all' && `All School Learners (${learners.length})`}
               </h2>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                {activeFilter === 'absent' 
-                  ? 'Click "Mark Present" to remove absence, or click any row to open full student profile' 
-                  : 'Click any row to open full student profile'}
-              </div>
             </div>
-            
+
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <select
                 className="class-select-dropdown"
@@ -151,31 +445,19 @@ export default function TodayView({
                 onChange={(e) => setSelectedClass(e.target.value)}
               >
                 <option value="ALL">All Classes ({learners.length})</option>
-                {classesList.map((cls) => {
-                  const count = learners.filter((l) => l.className === cls).length;
-                  return (
-                    <option key={cls} value={cls}>
-                      {cls} ({count})
-                    </option>
-                  );
-                })}
+                {classesList.map((cls) => (
+                  <option key={cls} value={cls}>{cls}</option>
+                ))}
               </select>
 
               <input
                 type="text"
                 className="search"
                 style={{ padding: '6px 12px', fontSize: 13, width: 160 }}
-                placeholder="Filter names..."
+                placeholder="Filter name..."
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
               />
-              <button 
-                className="secondary" 
-                style={{ padding: '6px 12px', fontSize: 12, borderRadius: 8 }}
-                onClick={() => setActiveFilter(null)}
-              >
-                Hide
-              </button>
             </div>
           </div>
 
@@ -184,70 +466,48 @@ export default function TodayView({
               <thead>
                 <tr>
                   <th style={{ width: '40px', textAlign: 'center' }}>#</th>
-                  <th>Admission No</th>
+                  <th>Adm No</th>
                   <th>Learner Name</th>
                   <th>Class</th>
-                  <th>Sec</th>
                   <th>Guardian</th>
                   <th>Contact</th>
                   <th style={{ textAlign: 'right' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {displayedLearners.length > 0 ? (
-                  displayedLearners.map((learner, index) => {
+                {learners
+                  .filter(l => selectedClass === 'ALL' || l.className === selectedClass)
+                  .filter(l => {
+                    const isAbsent = dailyBriefing.absentLearnerIds.includes(l.id);
+                    if (activeFilter === 'absent') return isAbsent;
+                    if (activeFilter === 'present') return !isAbsent;
+                    return true;
+                  })
+                  .map((learner, idx) => {
                     const isAbsent = dailyBriefing.absentLearnerIds.includes(learner.id);
-
                     return (
-                      <tr 
-                        key={learner.id} 
+                      <tr
+                        key={learner.id}
                         className="sheet-row"
                         onClick={() => onSelectLearner(learner.id)}
                       >
-                        <td style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 11 }}>
-                          {index + 1}
-                        </td>
-                        <td>
-                          <span className="sheet-adm">
-                            {learner.admissionNumber || '—'}
-                          </span>
-                        </td>
-                        <td className="sheet-name-cell">
-                          <strong>{learner.fullName}</strong>
-                        </td>
-                        <td>
-                          <span className="sheet-badge">{learner.className}</span>
-                        </td>
-                        <td>
-                          <span className="sheet-sec">{learner.section || '—'}</span>
-                        </td>
-                        <td>
-                          <span className="sheet-guardian">{learner.guardianName || '—'}</span>
-                        </td>
-                        <td style={{ fontSize: 12, color: 'var(--muted)' }}>
-                          {learner.guardianPhone || learner.email || '—'}
-                        </td>
+                        <td style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 11 }}>{idx + 1}</td>
+                        <td><span className="sheet-adm">{learner.admissionNumber || '—'}</span></td>
+                        <td className="sheet-name-cell"><strong>{learner.fullName}</strong></td>
+                        <td><span className="sheet-badge">{learner.className}</span></td>
+                        <td><span className="sheet-guardian">{learner.guardianName || '—'}</span></td>
+                        <td style={{ fontSize: 12, color: 'var(--muted)' }}>{learner.guardianPhone || '—'}</td>
                         <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                           <button
                             className={`mini-toggle-btn ${isAbsent ? 'toggle-absent' : 'toggle-present'}`}
                             onClick={() => onToggleAttendance(todayKey, learner.id)}
-                            title={isAbsent ? 'Mark as Present' : 'Mark as Absent'}
                           >
                             {isAbsent ? 'Mark Present' : 'Mark Absent'}
                           </button>
                         </td>
                       </tr>
                     );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan="8" className="empty" style={{ padding: '24px 0' }}>
-                      {activeFilter === 'absent' 
-                        ? 'Great news! No learners recorded as absent today.' 
-                        : 'No learners found matching filter.'}
-                    </td>
-                  </tr>
-                )}
+                  })}
               </tbody>
             </table>
           </div>
