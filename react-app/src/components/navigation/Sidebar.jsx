@@ -56,7 +56,7 @@ export default function Sidebar({
                 fontFamily: 'inherit',
               }}
             >
-              🔑 Change PIN
+              Change PIN
             </button>
             <button
               onClick={onLogout}

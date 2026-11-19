@@ -202,19 +202,6 @@ export default function LoginView() {
           </div>
         )}
       </div>
-
-      {/* Demo hint */}
-      <div
-        style={{
-          marginTop: 24,
-          fontSize: 11,
-          color: 'var(--muted)',
-          textAlign: 'center',
-          lineHeight: 1.6,
-        }}
-      >
-        Demo PINs: Headteacher <strong>0000</strong> · Teachers <strong>1111 – 4444</strong>
-      </div>
     </div>
   );
 }

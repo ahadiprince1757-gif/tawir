@@ -124,10 +124,9 @@ export default function MobileHeaderNav({
                   border: '1.5px solid var(--border)', background: 'var(--surface)',
                   color: 'var(--ink)', fontSize: 14, fontWeight: 600,
                   cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                  display: 'flex', alignItems: 'center', gap: 10,
                 }}
               >
-                <span>🔑</span> Change PIN
+                Change PIN
               </button>
 
               <button
@@ -137,10 +136,9 @@ export default function MobileHeaderNav({
                   border: '1.5px solid var(--border)', background: 'var(--surface)',
                   color: '#c0392b', fontSize: 14, fontWeight: 600,
                   cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                  display: 'flex', alignItems: 'center', gap: 10,
                 }}
               >
-                <span>🚪</span> Sign out
+                Sign out
               </button>
             </div>
           </div>

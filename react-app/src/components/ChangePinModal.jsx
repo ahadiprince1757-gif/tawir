@@ -208,7 +208,9 @@ export default function ChangePinModal({ isOpen, onClose }) {
         {done ? (
           /* Success state */
           <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+            <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--good)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 20, fontWeight: 700 }}>
+              ✓
+            </div>
             <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>
               PIN updated
             </div>
