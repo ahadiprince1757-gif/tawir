@@ -1,49 +1,69 @@
 import React from 'react';
 import { TrashIcon } from '../../Icons.jsx';
-import { activeFilterLabel } from '../../utils/formatters.js';
 
 export default function Sidebar({
   view,
   onNavigate,
   backendConnected,
   learnerCount,
-  activeClassScope,
-  onSelectClassScope,
-  availableClasses,
+  currentUser,
+  onLogout,
   onOpenEraseModal,
 }) {
   return (
     <aside>
-      <div className="brand brand-container" onClick={() => onNavigate('today')} style={{ cursor: 'pointer' }}>
+      {/* Brand */}
+      <div
+        className="brand brand-container"
+        onClick={() => onNavigate('today')}
+        style={{ cursor: 'pointer' }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src="/logo.png" alt="Tawir Logo" className="brand-logo" />
-          <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--ink)' }}>Tawir</span>
+          <img src="/logo.png" alt="Tawi Logo" className="brand-logo" />
+          <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--ink)' }}>Tawi</span>
         </div>
         <div className="brand-subtext" style={{ marginTop: 4 }}>School Operating Memory</div>
       </div>
 
-      {/* Role / Class Context Switcher */}
-      <div className="sidebar-scope-card">
-        <label className="sidebar-scope-label">Viewing As</label>
-        <select
-          className="sidebar-scope-select"
-          value={activeClassScope}
-          onChange={(e) => onSelectClassScope(e.target.value)}
-        >
-          <option value="ALL">Administrator (All School)</option>
-          <optgroup label="Teacher Class View">
-            {availableClasses.map((cls) => (
-              <option key={cls} value={cls}>
-                Teacher: {cls}
-              </option>
-            ))}
-          </optgroup>
-        </select>
-        <div className="sidebar-scope-hint">
-          {activeFilterLabel(activeClassScope, learnerCount)}
+      {/* Signed-in user card */}
+      {currentUser && (
+        <div className="sidebar-scope-card">
+          <label className="sidebar-scope-label">Signed in as</label>
+          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)', marginBottom: 2 }}>
+            {currentUser.name}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+            {currentUser.role === 'headteacher'
+              ? 'Headteacher · Full School'
+              : `Teacher · ${currentUser.className}`}
+          </div>
+          <button
+            onClick={onLogout}
+            style={{
+              width: '100%',
+              padding: '7px 0',
+              borderRadius: 7,
+              border: '1.5px solid var(--border)',
+              background: 'transparent',
+              color: 'var(--muted)',
+              fontSize: 12,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            Sign out
+          </button>
         </div>
+      )}
+
+      {/* Scope badge — read-only, derived from auth */}
+      <div className="sidebar-scope-hint" style={{ padding: '0 16px', marginBottom: 8, fontSize: 12, color: 'var(--muted)' }}>
+        {currentUser?.role === 'headteacher'
+          ? `All ${learnerCount} learners · full school`
+          : `${learnerCount} learners · ${currentUser?.className}`}
       </div>
 
+      {/* Nav */}
       <nav>
         <button className={view === 'today' ? 'active' : ''} onClick={() => onNavigate('today')}>
           Today
@@ -59,17 +79,21 @@ export default function Sidebar({
         </button>
       </nav>
 
-      <div className="sidebar-erase-container">
-        <button 
-          className="sidebar-erase-btn"
-          onClick={onOpenEraseModal}
-          title="Erase inserted data or reset system"
-        >
-          <TrashIcon size={14} />
-          <span>Erase Data / Reset</span>
-        </button>
-      </div>
+      {/* Erase — headteacher only */}
+      {onOpenEraseModal && (
+        <div className="sidebar-erase-container">
+          <button
+            className="sidebar-erase-btn"
+            onClick={onOpenEraseModal}
+            title="Erase inserted data or reset system"
+          >
+            <TrashIcon size={14} />
+            <span>Erase Data / Reset</span>
+          </button>
+        </div>
+      )}
 
+      {/* Backend status */}
       <div className="aside-note">
         <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
           <span
@@ -82,7 +106,7 @@ export default function Sidebar({
             }}
           />
           <strong style={{ fontSize: 11, color: backendConnected ? '#315d43' : '#795d28' }}>
-            {backendConnected ? 'Tawir Core Live' : 'Offline Mode'}
+            {backendConnected ? 'Tawi Core Live' : 'Offline Mode'}
           </strong>
         </div>
         Capture once.<br />

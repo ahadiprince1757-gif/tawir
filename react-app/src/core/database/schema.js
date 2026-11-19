@@ -86,6 +86,10 @@ export function createEvent({
   metadata = {},
   source = '',
   createdAt = new Date().toISOString(),
+  // Ownership — who created this record
+  createdByUserId = null,
+  createdByName = null,
+  createdByRole = null,
 }) {
   return {
     id: id || `ev_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -99,5 +103,8 @@ export function createEvent({
     metadata,
     source: String(source).trim(),
     createdAt,
+    createdByUserId,
+    createdByName,
+    createdByRole,
   };
 }

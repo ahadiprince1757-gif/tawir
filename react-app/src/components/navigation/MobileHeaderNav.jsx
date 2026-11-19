@@ -4,42 +4,64 @@ import { TrashIcon } from '../../Icons.jsx';
 export default function MobileHeaderNav({
   onNavigate,
   backendConnected,
-  activeClassScope,
-  onSelectClassScope,
-  availableClasses,
+  currentUser,
+  onLogout,
   onOpenEraseModal,
 }) {
   return (
     <header className="mobile-header">
       <div className="mobile-brand" onClick={() => onNavigate('today')}>
-        <img src="/logo.png" alt="Tawir Logo" className="mobile-brand-logo" />
-        <span className="mobile-brand-title">Tawir</span>
+        <img src="/logo.png" alt="Tawi Logo" className="mobile-brand-logo" />
+        <span className="mobile-brand-title">Tawi</span>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <select
-          className="header-scope-select"
-          value={activeClassScope}
-          onChange={(e) => onSelectClassScope(e.target.value)}
-          title="Switch view between your assigned class and all classes"
-        >
-          <option value="ALL">All School</option>
-          {availableClasses.map((cls) => (
-            <option key={cls} value={cls}>
-              {cls}
-            </option>
-          ))}
-        </select>
+        {/* Compact user chip */}
+        {currentUser && (
+          <button
+            onClick={onLogout}
+            title={`Signed in as ${currentUser.name} — tap to sign out`}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '4px 10px',
+              borderRadius: 20,
+              border: '1.5px solid var(--border)',
+              background: 'var(--surface)',
+              color: 'var(--ink)',
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              maxWidth: 140,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <span style={{ fontSize: 14 }}>{currentUser.role === 'headteacher' ? '🏫' : '👤'}</span>
+            <span>
+              {currentUser.role === 'headteacher'
+                ? 'Headteacher'
+                : currentUser.className}
+            </span>
+          </button>
+        )}
 
-        <button
-          className="mobile-header-erase-btn"
-          onClick={onOpenEraseModal}
-          title="Erase inserted data / Reset system"
-          aria-label="Erase system data"
-        >
-          <TrashIcon size={14} />
-        </button>
+        {/* Erase button — headteacher only */}
+        {onOpenEraseModal && (
+          <button
+            className="mobile-header-erase-btn"
+            onClick={onOpenEraseModal}
+            title="Erase inserted data / Reset system"
+            aria-label="Erase system data"
+          >
+            <TrashIcon size={14} />
+          </button>
+        )}
 
+        {/* Backend status */}
         <div className="mobile-status-indicator">
           <span
             className="mobile-status-dot"

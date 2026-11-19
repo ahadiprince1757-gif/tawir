@@ -5,11 +5,18 @@ import { timeLabel } from '../utils/formatters.js';
 export default function EventTimelineView({
   events,
   learners,
+  currentUser,
   onSelectLearner,
   onDeleteEvent,
   onDeleteEventsBatch,
   onClearAllEvents,
 }) {
+  // Determine if the current user can delete a given event
+  const canDelete = (ev) => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'headteacher') return true;
+    return ev.createdByUserId === currentUser.userId;
+  };
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState('createdAt'); // 'createdAt' | 'type' | 'learner' | 'class'
   const [sortDirection, setSortDirection] = useState('desc'); // 'desc' | 'asc'
@@ -120,7 +127,7 @@ export default function EventTimelineView({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          {events.length > 0 && (
+          {events.length > 0 && currentUser?.role === 'headteacher' && (
             <button
               className="btn-erase-all"
               onClick={() => onClearAllEvents && onClearAllEvents()}
@@ -253,13 +260,15 @@ export default function EventTimelineView({
                         )}
                       </td>
                       <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                        <button
-                          className="row-delete-btn"
-                          title="Erase this event immediately"
-                          onClick={() => onDeleteEvent && onDeleteEvent(ev.id)}
-                        >
-                          <TrashIcon size={13} />
-                        </button>
+                        {canDelete(ev) && (
+                          <button
+                            className="row-delete-btn"
+                            title="Erase this event"
+                            onClick={() => onDeleteEvent && onDeleteEvent(ev.id)}
+                          >
+                            <TrashIcon size={13} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
