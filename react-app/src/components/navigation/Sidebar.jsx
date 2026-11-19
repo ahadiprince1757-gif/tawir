@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { TrashIcon } from '../../Icons.jsx';
+import ChangePinModal from '../ChangePinModal.jsx';
 
 export default function Sidebar({
   view,
@@ -10,7 +11,9 @@ export default function Sidebar({
   onLogout,
   onOpenEraseModal,
 }) {
+  const [pinModalOpen, setPinModalOpen] = useState(false);
   return (
+    <>
     <aside>
       {/* Brand */}
       <div
@@ -37,22 +40,41 @@ export default function Sidebar({
               ? 'Headteacher · Full School'
               : `Teacher · ${currentUser.className}`}
           </div>
-          <button
-            onClick={onLogout}
-            style={{
-              width: '100%',
-              padding: '7px 0',
-              borderRadius: 7,
-              border: '1.5px solid var(--border)',
-              background: 'transparent',
-              color: 'var(--muted)',
-              fontSize: 12,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
-            Sign out
-          </button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onClick={() => setPinModalOpen(true)}
+              title="Change your PIN"
+              style={{
+                flex: 1,
+                padding: '7px 0',
+                borderRadius: 7,
+                border: '1.5px solid var(--border)',
+                background: 'transparent',
+                color: 'var(--muted)',
+                fontSize: 12,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              🔑 Change PIN
+            </button>
+            <button
+              onClick={onLogout}
+              style={{
+                flex: 1,
+                padding: '7px 0',
+                borderRadius: 7,
+                border: '1.5px solid var(--border)',
+                background: 'transparent',
+                color: 'var(--muted)',
+                fontSize: 12,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              Sign out
+            </button>
+          </div>
         </div>
       )}
 
@@ -113,5 +135,8 @@ export default function Sidebar({
         Derived everywhere.
       </div>
     </aside>
+
+      <ChangePinModal isOpen={pinModalOpen} onClose={() => setPinModalOpen(false)} />
+    </>
   );
 }
