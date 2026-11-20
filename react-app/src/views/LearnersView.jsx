@@ -1,11 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import { searchLearners } from '../core/learners/learnerMatcher.js';
+import AddLearnerModal from '../components/AddLearnerModal.jsx';
 import { TrashIcon } from '../Icons.jsx';
 
 export default function LearnersView({
   learners,
   schoolMemory,
+  currentUser,
+  permissions,
+  activeSchool,
+  activeClass,
   onSelectLearner,
+  onAddLearner,
   onDeleteLearners,
   onClearColumn,
   onToast,
@@ -16,6 +22,7 @@ export default function LearnersView({
   const [sortDirection, setSortDirection] = useState('asc'); // 'asc' | 'desc'
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [selectedCol, setSelectedCol] = useState(''); // '' | 'section' | 'guardianName' | 'contact' | 'attendance'
+  const [isAddLearnerOpen, setIsAddLearnerOpen] = useState(false);
 
   // Unique classes for filter chips & dropdown
   const classesList = useMemo(() => {
@@ -150,6 +157,23 @@ export default function LearnersView({
           <span className="results-badge">
             {filtered.length} of {learners.length}
           </span>
+          <button
+            type="button"
+            onClick={() => setIsAddLearnerOpen(true)}
+            style={{
+              padding: '8px 14px',
+              borderRadius: 8,
+              border: 'none',
+              background: 'var(--ink)',
+              color: '#fff',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            + Add Learner
+          </button>
         </div>
       </div>
 
@@ -381,6 +405,16 @@ export default function LearnersView({
           </table>
         </div>
       </div>
+
+      <AddLearnerModal
+        isOpen={isAddLearnerOpen}
+        onClose={() => setIsAddLearnerOpen(false)}
+        activeSchool={activeSchool}
+        activeClass={activeClass}
+        currentUser={currentUser}
+        onAddLearner={onAddLearner}
+        onToast={onToast}
+      />
     </section>
   );
 }

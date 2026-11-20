@@ -7,14 +7,23 @@ import { TrashIcon } from '../Icons.jsx';
 export default function SmartSheetView({
   existingLearners = [],
   currentUser,
+  activeSchool,
+  activeClass,
   onImportRecords,
   onToast,
   onNavigate,
 }) {
   const [selectedType, setSelectedType] = useState(IMPORT_TYPES.ASSESSMENT);
   const [selectedTemplateKey, setSelectedTemplateKey] = useState('exam_marks');
-  const [targetClass, setTargetClass] = useState(() => currentUser?.className || 'Grade 2 Red');
+  const [targetClass, setTargetClass] = useState(() => activeClass?.className || currentUser?.className || 'Grade 2 Red');
   const [recordDate, setRecordDate] = useState(() => new Date().toISOString().split('T')[0]);
+
+  // Keep targetClass in sync when activeClass changes
+  useEffect(() => {
+    if (activeClass?.className) {
+      setTargetClass(activeClass.className);
+    }
+  }, [activeClass]);
 
   // Raw Input & Pipeline State
   const [rawText, setRawText] = useState('');
@@ -170,6 +179,8 @@ export default function SmartSheetView({
       targetClass,
       assessmentDate: recordDate,
       existingLearners,
+      schoolId: activeSchool?.id,
+      classId: activeClass?.classId,
     });
 
     if (onImportRecords) {
@@ -187,7 +198,9 @@ export default function SmartSheetView({
       {/* Page Header */}
       <div className="page-head">
         <div>
-          <div className="eyebrow">Universal Ingestion Engine</div>
+          <div className="eyebrow">
+            {activeSchool?.name || 'Multi-Tenant'} • Bulk Ingestion Console
+          </div>
           <h1>Smart Sheet</h1>
           <div className="sub">
             Paste from Excel, Google Sheets, WhatsApp, or Word. Verify in the live grid, then commit directly to School Operating Memory.

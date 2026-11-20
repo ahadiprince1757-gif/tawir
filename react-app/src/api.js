@@ -63,6 +63,19 @@ export const api = {
     });
   },
 
+  importLearnersBatchRpc: async (schoolId, classId, learnersList) => {
+    if (isSupabaseConfigured()) {
+      const { data, error } = await supabase.rpc('import_learners_batch', {
+        p_school_id: schoolId,
+        p_class_id: classId,
+        p_learners: learnersList,
+      });
+      if (error) throw error;
+      return data;
+    }
+    return null;
+  },
+
   deleteLearner: async (learnerId) => {
     if (isSupabaseConfigured()) {
       const { error } = await supabase.from('learners').delete().eq('id', learnerId);
@@ -142,10 +155,10 @@ export const api = {
 
   resetSystem: () => request('/reset', { method: 'POST' }),
 
-  toggleAttendance: async (dateKey, learnerId) => {
+  toggleAttendance: async (dateKey, learnerId, schoolId = null, classId = null, ownership = {}) => {
     if (isSupabaseConfigured()) {
       // Check existing absence
-      const { data, error } = await supabase
+      let query = supabase
         .from('events')
         .select('id')
         .eq('type', 'attendance')
@@ -153,6 +166,9 @@ export const api = {
         .eq('date', dateKey)
         .eq('learner_id', learnerId);
 
+      if (schoolId) query = query.eq('school_id', schoolId);
+
+      const { data, error } = await query;
       if (error) throw error;
 
       if (data && data.length > 0) {
@@ -161,21 +177,27 @@ export const api = {
         return { action: 'present' };
       } else {
         // Record absence
-        await supabase.from('events').insert({
+        const payload = {
           id: `ev_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          school_id: schoolId || '11111111-1111-1111-1111-111111111111',
+          class_id: classId || null,
           type: 'attendance',
           action: 'absent',
           learner_id: learnerId,
           date: dateKey,
+          value: {},
           source: 'Attendance checklist toggle',
-        });
+          created_by_user_id: ownership?.createdByUserId || null,
+        };
+        const { error: insErr } = await supabase.from('events').insert(payload);
+        if (insErr) throw insErr;
         return { action: 'absent' };
       }
     }
 
     return request('/attendance/toggle', {
       method: 'POST',
-      body: JSON.stringify({ dateKey, learnerId }),
+      body: JSON.stringify({ dateKey, learnerId, schoolId, classId }),
     });
   },
 };

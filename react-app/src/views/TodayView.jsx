@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import WhatHappenedComposer from '../components/WhatHappenedComposer.jsx';
 import AddRecordModal from '../components/AddRecordModal.jsx';
+import AddLearnerModal from '../components/AddLearnerModal.jsx';
 import { todayDateKey, todayDateLabel, timeLabel } from '../utils/formatters.js';
 
 export default function TodayView({
@@ -8,9 +9,14 @@ export default function TodayView({
   learners,
   events,
   currentUser,
+  activeSchool,
+  activeClass,
+  classAssignments,
+  onSelectClass,
   onCommitEvent,
   onToggleAttendance,
   onSelectLearner,
+  onAddLearner,
   onToast,
   onNavigate,
 }) {
@@ -19,6 +25,7 @@ export default function TodayView({
 
   // Teacher Quick Modal State
   const [isAddRecordOpen, setIsAddRecordOpen] = useState(false);
+  const [isAddLearnerOpen, setIsAddLearnerOpen] = useState(false);
   const [recordInitialType, setRecordInitialType] = useState('observation');
 
   // Attendance & Filtering State
@@ -106,14 +113,14 @@ export default function TodayView({
               textAlign: 'left',
             }}
           >
-            <span>Attendance</span>
+            <span>Attendance Roll</span>
             <small style={{ fontWeight: 400, opacity: 0.85, fontSize: 11 }}>
-              {dailyBriefing.absent > 0 ? `${dailyBriefing.absent} marked absent` : 'Mark roll call'}
+              {dailyBriefing.absent > 0 ? `${dailyBriefing.absent} absent • Tap exceptions` : 'All present • Tap exceptions'}
             </small>
           </button>
 
           <button
-            onClick={() => onNavigate && onNavigate('smartsheet')}
+            onClick={() => setIsAddLearnerOpen(true)}
             style={{
               padding: '12px 14px',
               borderRadius: 12,
@@ -130,14 +137,14 @@ export default function TodayView({
               textAlign: 'left',
             }}
           >
-            <span>Assessment</span>
+            <span>+ Add Learner</span>
             <small style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11 }}>
-              Enter marks & tests
+              3-click class enrollment
             </small>
           </button>
 
           <button
-            onClick={() => handleOpenAddRecord('learning_difficulty')}
+            onClick={() => handleOpenAddRecord('assessment')}
             style={{
               padding: '12px 14px',
               borderRadius: 12,
@@ -154,9 +161,9 @@ export default function TodayView({
               textAlign: 'left',
             }}
           >
-            <span>Learning Mistake</span>
+            <span>Record Marks</span>
             <small style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11 }}>
-              Tag skill / concept error
+              Quick test & exam scores
             </small>
           </button>
 
@@ -180,7 +187,7 @@ export default function TodayView({
           >
             <span>Add Observation</span>
             <small style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11 }}>
-              Note progress or behaviour
+              Note progress or mistake
             </small>
           </button>
         </div>
@@ -260,14 +267,33 @@ export default function TodayView({
                 Click any learner to view their complete dossier & evidence history
               </div>
             </div>
-            <input
-              type="text"
-              placeholder="Search learner..."
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-              className="search"
-              style={{ width: 180, padding: '6px 12px', fontSize: 13 }}
-            />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="Search learner..."
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                className="search"
+                style={{ width: 170, padding: '6px 12px', fontSize: 13 }}
+              />
+              <button
+                type="button"
+                onClick={() => setIsAddLearnerOpen(true)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: 'var(--ink)',
+                  color: '#fff',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                + Add Learner
+              </button>
+            </div>
           </div>
 
           <div className="table-responsive">
@@ -357,15 +383,28 @@ export default function TodayView({
           )}
         </div>
 
-        {/* Modal: Add Record / Add Observation */}
+        {/* Modal: Add Record / Add Observation / Assessment */}
         <AddRecordModal
           isOpen={isAddRecordOpen}
           onClose={() => setIsAddRecordOpen(false)}
           learners={learners}
           currentUser={currentUser}
+          activeSchool={activeSchool}
+          activeClass={activeClass}
           onCommitEvent={onCommitEvent}
           onToast={onToast}
           initialType={recordInitialType}
+        />
+
+        {/* Modal: 3-Click Add Learner */}
+        <AddLearnerModal
+          isOpen={isAddLearnerOpen}
+          onClose={() => setIsAddLearnerOpen(false)}
+          activeSchool={activeSchool}
+          activeClass={activeClass}
+          currentUser={currentUser}
+          onAddLearner={onAddLearner}
+          onToast={onToast}
         />
       </section>
     );

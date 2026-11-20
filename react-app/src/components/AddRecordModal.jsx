@@ -7,13 +7,17 @@ export default function AddRecordModal({
   onClose,
   learners = [],
   currentUser,
+  activeSchool,
+  activeClass,
   onCommitEvent,
   onToast,
-  initialType = 'observation', // 'observation' | 'learning_difficulty' | 'behaviour' | 'commendation'
+  initialType = 'observation', // 'assessment' | 'observation' | 'learning_difficulty' | 'behaviour' | 'commendation'
 }) {
   const [recordType, setRecordType] = useState(initialType);
   const [selectedLearnerId, setSelectedLearnerId] = useState('');
   const [subject, setSubject] = useState('Mathematics');
+  const [score, setScore] = useState('80');
+  const [outOf, setOutOf] = useState('100');
   const [topic, setTopic] = useState('');
   const [mistakeTag, setMistakeTag] = useState('');
   const [details, setDetails] = useState('');
@@ -33,7 +37,10 @@ export default function AddRecordModal({
     let eventType = 'note';
     let action = 'observation';
 
-    if (recordType === 'learning_difficulty') {
+    if (recordType === 'assessment') {
+      eventType = 'assessment';
+      action = 'score';
+    } else if (recordType === 'learning_difficulty') {
       eventType = 'classwork';
       action = 'learning_difficulty';
     } else if (recordType === 'behaviour') {
@@ -44,20 +51,29 @@ export default function AddRecordModal({
       action = 'commendation';
     }
 
+    const numScore = Number(score);
+    const numOutOf = Number(outOf) || 100;
+
     const newEv = createEvent({
+      schoolId: activeSchool?.id || learner?.schoolId || currentUser?.schoolId || '11111111-1111-1111-1111-111111111111',
       type: eventType,
       action,
       learnerId: selectedLearnerId,
-      className: learner?.className || currentUser?.className || null,
-      classId:   learner?.classId   || currentUser?.classId   || null,
+      className: learner?.className || activeClass?.className || currentUser?.className || null,
+      classId:   learner?.classId   || activeClass?.classId   || currentUser?.classId   || null,
       date,
       value: {
+        score: recordType === 'assessment' ? numScore : null,
+        outOf: recordType === 'assessment' ? numOutOf : null,
+        percentage: recordType === 'assessment' ? Math.round((numScore / numOutOf) * 100) : null,
         subject: recordType !== 'behaviour' && recordType !== 'commendation' ? subject : null,
         topic: topic.trim() || null,
         mistakeTag: mistakeTag.trim() || null,
         details: details.trim(),
       },
-      source: `Teacher Record • ${learner?.fullName}`,
+      source: recordType === 'assessment'
+        ? `Assessment • ${subject}`
+        : `Teacher Record • ${learner?.fullName}`,
       createdByUserId: currentUser?.userId,
       createdByName:   currentUser?.name,
       createdByRole:   currentUser?.role,
@@ -115,10 +131,11 @@ export default function AddRecordModal({
             <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>
               Record Type
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 6 }}>
               {[
+                { id: 'assessment', label: 'Assessment' },
                 { id: 'observation', label: 'Observation' },
-                { id: 'learning_difficulty', label: 'Learning Mistake' },
+                { id: 'learning_difficulty', label: 'Mistake Tag' },
                 { id: 'behaviour', label: 'Discipline' },
                 { id: 'commendation', label: 'Commendation' },
               ].map(t => (
@@ -127,12 +144,12 @@ export default function AddRecordModal({
                   key={t.id}
                   onClick={() => setRecordType(t.id)}
                   style={{
-                    padding: '8px 10px',
+                    padding: '8px 8px',
                     borderRadius: 8,
                     border: recordType === t.id ? '1.5px solid var(--ink)' : '1px solid var(--border)',
                     background: recordType === t.id ? 'var(--ink)' : 'var(--surface)',
                     color: recordType === t.id ? '#fff' : 'var(--ink)',
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: 600,
                     cursor: 'pointer',
                     fontFamily: 'inherit',
@@ -147,7 +164,7 @@ export default function AddRecordModal({
           {/* Learner Picker */}
           <div>
             <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
-              Learner
+              Learner *
             </label>
             <select
               value={selectedLearnerId}
@@ -172,6 +189,87 @@ export default function AddRecordModal({
               ))}
             </select>
           </div>
+
+          {/* Assessment Fields: Subject & Score */}
+          {recordType === 'assessment' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: 8 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+                  Subject
+                </label>
+                <select
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1.5px solid var(--border)',
+                    background: 'var(--surface)',
+                    color: 'var(--ink)',
+                    fontSize: 13,
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  <option value="Mathematics">Mathematics</option>
+                  <option value="English">English</option>
+                  <option value="Kiswahili">Kiswahili</option>
+                  <option value="Science">Science / Env</option>
+                  <option value="CRE">CRE</option>
+                  <option value="General">General</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+                  Score
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="1000"
+                  value={score}
+                  onChange={(e) => setScore(e.target.value)}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1.5px solid var(--border)',
+                    background: 'var(--surface)',
+                    color: 'var(--ink)',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+                  Out Of
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={outOf}
+                  onChange={(e) => setOutOf(e.target.value)}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1.5px solid var(--border)',
+                    background: 'var(--surface)',
+                    color: 'var(--ink)',
+                    fontSize: 13,
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Subject & Topic (for observation & learning difficulty) */}
           {(recordType === 'observation' || recordType === 'learning_difficulty') && (

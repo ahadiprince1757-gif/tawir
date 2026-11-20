@@ -21,6 +21,8 @@ export function transformSmartSheetToRecords({
   targetClass,
   assessmentDate = new Date().toISOString().split('T')[0],
   existingLearners = [],
+  schoolId = null,
+  classId = null,
 }) {
   const newEvents = [];
   const newLearners = [];
@@ -33,7 +35,8 @@ export function transformSmartSheetToRecords({
   };
 
   const className = targetClass || currentUser?.className || 'General';
-  const classId = className.toLowerCase().replace(/\s+/g, '_');
+  const resolvedClassId = classId || className.toLowerCase().replace(/\s+/g, '_');
+  const resolvedSchoolId = schoolId || currentUser?.schoolId || '11111111-1111-1111-1111-111111111111';
 
   for (const row of rows) {
     if (!row.selected) continue; // skip unselected rows
@@ -47,10 +50,11 @@ export function transformSmartSheetToRecords({
 
     if (!learner && rawName) {
       const created = createLearner({
+        schoolId: resolvedSchoolId,
         admissionNumber: rawAdm,
         fullName: rawName,
         className,
-        classId,
+        classId: resolvedClassId,
         gender: cells.gender || '',
         guardianName: cells.guardianName || '',
         guardianPhone: cells.guardianPhone || '',
@@ -78,11 +82,12 @@ export function transformSmartSheetToRecords({
         const tag = cells.tag || cells.mistakeTag || null;
 
         const ev = createEvent({
+          schoolId: resolvedSchoolId,
           type: 'assessment',
           action: 'score',
           learnerId,
           className,
-          classId,
+          classId: resolvedClassId,
           date: assessmentDate,
           value: {
             score: scoreNum,
@@ -118,11 +123,12 @@ export function transformSmartSheetToRecords({
         // Only record non-presence events (presence is the default state)
         if (isAbsent || isLate) {
           const ev = createEvent({
+            schoolId: resolvedSchoolId,
             type: 'attendance',
             action: isAbsent ? 'absent' : 'late',
             learnerId,
             className,
-            classId,
+            classId: resolvedClassId,
             date: assessmentDate,
             metadata: {
               dayColumn: col.label,
@@ -148,11 +154,12 @@ export function transformSmartSheetToRecords({
       const details = cells.details || cells.note || '';
 
       const ev = createEvent({
+        schoolId: resolvedSchoolId,
         type: 'incident',
         action,
         learnerId,
         className,
-        classId,
+        classId: resolvedClassId,
         date: assessmentDate,
         value: { details },
         source: `Smart Sheet Incident Log`,
@@ -168,11 +175,12 @@ export function transformSmartSheetToRecords({
       const note = cells.note || cells.observation || '';
 
       const ev = createEvent({
+        schoolId: resolvedSchoolId,
         type: 'note',
         action: 'observation',
         learnerId,
         className,
-        classId,
+        classId: resolvedClassId,
         date: assessmentDate,
         value: { subject, note },
         source: `Smart Sheet Observation Log`,
@@ -185,11 +193,12 @@ export function transformSmartSheetToRecords({
     // ── 6. CUSTOM TABLE COMMIT ──────────────────────────────────────────────
     else {
       const ev = createEvent({
+        schoolId: resolvedSchoolId,
         type: 'note',
         action: 'custom_record',
         learnerId,
         className,
-        classId,
+        classId: resolvedClassId,
         date: assessmentDate,
         value: cells,
         source: `Smart Sheet Custom Import`,

@@ -14,12 +14,13 @@ export default function LearnerMemoryModal({ learnerId, schoolMemory, onClose })
   const { learner, attendance, academics, classwork, behaviour, recentTimeline, patterns } = memory;
 
   const tabs = [
-    { id: 'overview',   label: 'Overview' },
-    { id: 'attendance', label: 'Attendance' },
-    { id: 'academic',   label: 'Academic' },
-    { id: 'learning',   label: 'Learning' },
-    { id: 'behaviour',  label: 'Behaviour' },
-    { id: 'timeline',   label: 'Timeline' },
+    { id: 'overview',      label: 'Overview' },
+    { id: 'attendance',    label: 'Attendance' },
+    { id: 'academic',      label: 'Academic' },
+    { id: 'learning',      label: 'Learning' },
+    { id: 'behaviour',     label: 'Behaviour' },
+    { id: 'interventions', label: 'Interventions' },
+    { id: 'timeline',      label: 'Timeline' },
   ];
 
   return (
@@ -274,6 +275,51 @@ export default function LearnerMemoryModal({ learnerId, schoolMemory, onClose })
               </div>
             ) : (
               <div className="empty">No incidents or commendations recorded yet.</div>
+            )}
+          </div>
+        )}
+
+        {/* ── INTERVENTIONS TAB ─────────────────────────────────────────────── */}
+        {activeTab === 'interventions' && (
+          <div className="memory-section" style={{ marginTop: 10 }}>
+            <h4>Skill Support & Interventions</h4>
+            {patterns.length > 0 && (
+              <div className="pattern-alerts" style={{ marginBottom: 14 }}>
+                {patterns.map((p, i) => (
+                  <div key={i} className={`pattern-alert ${p.severity}`}>
+                    <div className="pattern-title">Recommended Intervention: {p.title}</div>
+                    <div className="pattern-desc">{p.description}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {recentTimeline.filter(e => e.type === 'classwork' || e.type === 'incident' || e.action === 'intervention').length > 0 ? (
+              <div className="recent-timeline">
+                {recentTimeline
+                  .filter(e => e.type === 'classwork' || e.type === 'incident' || e.action === 'intervention')
+                  .map((ev) => (
+                    <div key={ev.id} className="timeline-item">
+                      <div className="timeline-meta">
+                        <span className="tag" style={{ background: 'var(--ink)', color: '#fff' }}>
+                          Target Skill: {ev.value?.topic || ev.value?.subject || 'Foundational'}
+                        </span>
+                        <span className="timeline-date">{timeLabel(ev.createdAt)}</span>
+                      </div>
+                      <div style={{ marginTop: 6, fontSize: 13 }}>
+                        <strong>Action: </strong>
+                        <span>{ev.value?.details || ev.value?.note || ev.source || ev.action}</span>
+                      </div>
+                      {ev.createdByName && (
+                        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                          Assigned Teacher: {ev.createdByName} ({ev.createdByRole || 'Teacher'})
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <div className="empty">No targeted interventions active. Learner is progressing on track.</div>
             )}
           </div>
         )}

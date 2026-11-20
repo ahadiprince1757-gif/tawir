@@ -203,6 +203,21 @@ export default function App() {
     }
   };
 
+  const handleAddLearner = async (learnerData) => {
+    const stamped = {
+      ...learnerData,
+      schoolId: activeSchool?.id || learnerData.schoolId,
+      classId:  activeClass?.classId || learnerData.classId,
+    };
+    setLearners((prev) => [...prev, stamped]);
+    try {
+      await api.addLearners([stamped]);
+      setBackendConnected(true);
+    } catch (err) {
+      console.warn('Learner saved locally:', err.message);
+    }
+  };
+
   const handleImportLearners = async (newLearners, newEvents = []) => {
     const stampedLearners = newLearners.map(l => ({
       ...l,
@@ -396,6 +411,7 @@ export default function App() {
             onCommitEvent={handleCommitEvent}
             onToggleAttendance={handleToggleAttendance}
             onSelectLearner={(id) => setSelectedLearnerId(id)}
+            onAddLearner={handleAddLearner}
             onToast={showToast}
             onNavigate={setView}
           />
@@ -407,7 +423,10 @@ export default function App() {
             schoolMemory={schoolMemory}
             currentUser={currentUser}
             permissions={perms}
+            activeSchool={activeSchool}
+            activeClass={activeClass}
             onSelectLearner={(id) => setSelectedLearnerId(id)}
+            onAddLearner={handleAddLearner}
             onDeleteLearners={handleDeleteLearners}
             onClearColumn={handleClearColumn}
             onToast={showToast}
