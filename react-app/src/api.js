@@ -98,7 +98,7 @@ export const api = {
   // ── Learners ───────────────────────────────────────────────────────────────
   getLearners: async () => {
     if (isSupabaseConfigured()) {
-      const { data, error } = await supabase.from('learners').select('*').order('full_name');
+      const { data, error } = await supabase.from('learners').select('*, classes(name)').order('full_name');
       if (error) throw error;
       return (data || []).map(fromDbLearner);
     }
