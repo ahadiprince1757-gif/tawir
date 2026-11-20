@@ -1,3 +1,12 @@
+import {
+  supabase,
+  isSupabaseConfigured,
+  toDbLearner,
+  fromDbLearner,
+  toDbEvent,
+  fromDbEvent,
+} from './core/database/supabaseClient.js';
+
 const API_BASE = import.meta.env.VITE_API_URL 
   ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api` 
   : '/api';
@@ -21,54 +30,152 @@ async function request(endpoint, options = {}) {
 }
 
 export const api = {
-  checkHealth: () => request('/health'),
+  checkHealth: async () => {
+    if (isSupabaseConfigured()) {
+      return { status: 'live', engine: 'supabase' };
+    }
+    return request('/health');
+  },
+
   getSettings: () => request('/settings'),
   finishSetup: () => request('/settings/setup-done', { method: 'POST' }),
 
-  // Learners
-  getLearners: () => request('/learners'),
-  addLearners: (learners) =>
-    request('/learners', {
+  // ── Learners ───────────────────────────────────────────────────────────────
+  getLearners: async () => {
+    if (isSupabaseConfigured()) {
+      const { data, error } = await supabase.from('learners').select('*').order('full_name');
+      if (error) throw error;
+      return (data || []).map(fromDbLearner);
+    }
+    return request('/learners');
+  },
+
+  addLearners: async (learners) => {
+    if (isSupabaseConfigured()) {
+      const payload = learners.map(toDbLearner);
+      const { data, error } = await supabase.from('learners').upsert(payload);
+      if (error) throw error;
+      return data;
+    }
+    return request('/learners', {
       method: 'POST',
       body: JSON.stringify(learners),
-    }),
-  deleteLearner: (learnerId) =>
-    request(`/learners/${learnerId}`, {
-      method: 'DELETE',
-    }),
-  deleteLearnersBatch: (ids) =>
-    request('/learners/delete-batch', {
+    });
+  },
+
+  deleteLearner: async (learnerId) => {
+    if (isSupabaseConfigured()) {
+      const { error } = await supabase.from('learners').delete().eq('id', learnerId);
+      if (error) throw error;
+      return { success: true };
+    }
+    return request(`/learners/${learnerId}`, { method: 'DELETE' });
+  },
+
+  deleteLearnersBatch: async (ids) => {
+    if (isSupabaseConfigured()) {
+      const { error } = await supabase.from('learners').delete().in('id', ids);
+      if (error) throw error;
+      return { success: true };
+    }
+    return request('/learners/delete-batch', {
       method: 'POST',
       body: JSON.stringify({ ids }),
-    }),
+    });
+  },
 
-  // Events (Operating Memory)
-  getEvents: () => request('/events'),
-  createEvent: (event) =>
-    request('/events', {
+  // ── Events (School Operating Memory) ───────────────────────────────────────
+  getEvents: async () => {
+    if (isSupabaseConfigured()) {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .order('date', { ascending: false });
+      if (error) throw error;
+      return (data || []).map(fromDbEvent);
+    }
+    return request('/events');
+  },
+
+  createEvent: async (event) => {
+    if (isSupabaseConfigured()) {
+      const payload = toDbEvent(event);
+      const { data, error } = await supabase.from('events').insert(payload).select();
+      if (error) throw error;
+      return data ? fromDbEvent(data[0]) : event;
+    }
+    return request('/events', {
       method: 'POST',
       body: JSON.stringify(event),
-    }),
-  deleteEvent: (eventId) =>
-    request(`/events/${eventId}`, {
-      method: 'DELETE',
-    }),
-  deleteEventsBatch: (ids) =>
-    request('/events/delete-batch', {
+    });
+  },
+
+  deleteEvent: async (eventId) => {
+    if (isSupabaseConfigured()) {
+      const { error } = await supabase.from('events').delete().eq('id', eventId);
+      if (error) throw error;
+      return { success: true };
+    }
+    return request(`/events/${eventId}`, { method: 'DELETE' });
+  },
+
+  deleteEventsBatch: async (ids) => {
+    if (isSupabaseConfigured()) {
+      const { error } = await supabase.from('events').delete().in('id', ids);
+      if (error) throw error;
+      return { success: true };
+    }
+    return request('/events/delete-batch', {
       method: 'POST',
       body: JSON.stringify({ ids }),
-    }),
-  clearAllEvents: () =>
-    request('/events', {
-      method: 'DELETE',
-    }),
-  resetSystem: () =>
-    request('/reset', {
-      method: 'POST',
-    }),
-  toggleAttendance: (dateKey, learnerId) =>
-    request('/attendance/toggle', {
+    });
+  },
+
+  clearAllEvents: async () => {
+    if (isSupabaseConfigured()) {
+      const { error } = await supabase.from('events').delete().neq('id', '___safe_sentinel___');
+      if (error) throw error;
+      return { success: true };
+    }
+    return request('/events', { method: 'DELETE' });
+  },
+
+  resetSystem: () => request('/reset', { method: 'POST' }),
+
+  toggleAttendance: async (dateKey, learnerId) => {
+    if (isSupabaseConfigured()) {
+      // Check existing absence
+      const { data, error } = await supabase
+        .from('events')
+        .select('id')
+        .eq('type', 'attendance')
+        .eq('action', 'absent')
+        .eq('date', dateKey)
+        .eq('learner_id', learnerId);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        // Remove absence
+        await supabase.from('events').delete().eq('id', data[0].id);
+        return { action: 'present' };
+      } else {
+        // Record absence
+        await supabase.from('events').insert({
+          id: `ev_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          type: 'attendance',
+          action: 'absent',
+          learner_id: learnerId,
+          date: dateKey,
+          source: 'Attendance checklist toggle',
+        });
+        return { action: 'absent' };
+      }
+    }
+
+    return request('/attendance/toggle', {
       method: 'POST',
       body: JSON.stringify({ dateKey, learnerId }),
-    }),
+    });
+  },
 };
