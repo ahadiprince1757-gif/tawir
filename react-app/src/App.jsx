@@ -5,6 +5,7 @@ import { getMockLearners, getMockEvents } from './core/database/mockData.js';
 import { useAuth } from './core/auth/authContext.jsx';
 import { getPermissions } from './core/auth/permissions.js';
 import { api } from './api.js';
+import { isSupabaseConfigured } from './core/database/supabaseClient.js';
 import './App.css';
 
 // Components & Navigation
@@ -120,10 +121,22 @@ export default function App() {
         ]);
         setBackendConnected(true);
         if (Array.isArray(learnersData)) {
-          setLearners(learnersData.length > 0 ? learnersData.map(createLearner) : []);
+          if (learnersData.length > 0) {
+            setLearners(learnersData.map(createLearner));
+          } else if (!isSupabaseConfigured()) {
+            setLearners(getMockLearners());
+          } else {
+            setLearners([]);
+          }
         }
         if (Array.isArray(eventsData)) {
-          setEvents(eventsData.map(createEvent));
+          if (eventsData.length > 0) {
+            setEvents(eventsData.map(createEvent));
+          } else if (!isSupabaseConfigured()) {
+            setEvents(getMockEvents());
+          } else {
+            setEvents([]);
+          }
         }
       } catch (err) {
         console.warn('Backend not reachable, offline mode:', err.message);
