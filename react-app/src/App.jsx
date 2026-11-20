@@ -119,8 +119,8 @@ export default function App() {
           api.getEvents(),
         ]);
         setBackendConnected(true);
-        if (Array.isArray(learnersData) && learnersData.length > 0) {
-          setLearners(learnersData.map(createLearner));
+        if (Array.isArray(learnersData)) {
+          setLearners(learnersData.length > 0 ? learnersData.map(createLearner) : []);
         }
         if (Array.isArray(eventsData)) {
           setEvents(eventsData.map(createEvent));
@@ -347,6 +347,17 @@ export default function App() {
     if (!perms.canResetSystem) {
       showToast('Only the headteacher or platform administrator can reset the system.');
       return;
+    }
+    try {
+      const res = await api.resetSystem();
+      if (res && res.learners) {
+        setLearners(res.learners.map(createLearner));
+        setEvents((res.events || []).map(createEvent));
+        showToast('Backend reset to pristine seed state!');
+        return;
+      }
+    } catch {
+      // Fallback for offline mode
     }
     const mockLearners = getMockLearners();
     const mockEvents = getMockEvents();

@@ -40,6 +40,47 @@ export const api = {
   getSettings: () => request('/settings'),
   finishSetup: () => request('/settings/setup-done', { method: 'POST' }),
 
+  // ── Schools & Classes (Backend Source of Truth) ───────────────────────────
+  getSchools: async () => {
+    if (isSupabaseConfigured()) {
+      const { data, error } = await supabase.from('schools').select('*').order('name');
+      if (error) throw error;
+      return (data || []).map(s => ({
+        id: s.id,
+        code: s.code,
+        name: s.name,
+        status: s.status,
+      }));
+    }
+    return request('/schools');
+  },
+
+  getClasses: async (schoolId) => {
+    if (isSupabaseConfigured()) {
+      let query = supabase.from('classes').select('*').order('name');
+      if (schoolId) query = query.eq('school_id', schoolId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []).map(c => ({
+        id: c.id,
+        schoolId: c.school_id,
+        name: c.name,
+        gradeLevel: c.grade_level,
+        stream: c.stream,
+      }));
+    }
+    const queryParam = schoolId ? `?schoolId=${encodeURIComponent(schoolId)}` : '';
+    return request(`/classes${queryParam}`);
+  },
+
+  getUsers: async () => {
+    try {
+      return await request('/users');
+    } catch {
+      return [];
+    }
+  },
+
   // ── Learners ───────────────────────────────────────────────────────────────
   getLearners: async () => {
     if (isSupabaseConfigured()) {

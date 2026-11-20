@@ -41,6 +41,29 @@ app.post('/api/settings/setup-done', (req, res) => {
   res.json({ success: true, settings: db.settings });
 });
 
+// Schools
+app.get('/api/schools', (req, res) => {
+  const db = readDb();
+  res.json(db.schools || []);
+});
+
+// Classes
+app.get('/api/classes', (req, res) => {
+  const db = readDb();
+  const { schoolId } = req.query;
+  let classes = db.classes || [];
+  if (schoolId) {
+    classes = classes.filter(c => c.schoolId === schoolId);
+  }
+  res.json(classes);
+});
+
+// Users & Roles
+app.get('/api/users', (req, res) => {
+  const db = readDb();
+  res.json(db.users || []);
+});
+
 // Learners (Unified entity)
 app.get('/api/learners', (req, res) => {
   const db = readDb();

@@ -16,6 +16,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase, isSupabaseConfigured } from '../database/supabaseClient.js';
+import { api } from '../../api.js';
 
 // ── CANONICAL SEED ACCOUNTS & TENANTS (For local dev / offline mode) ──────────
 
@@ -251,6 +252,10 @@ function getEffectivePin(userId) {
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
+  const [schools, setSchools] = useState(SEED_SCHOOLS);
+  const [classes, setClasses] = useState(SEED_CLASSES);
+  const [users, setUsers] = useState(SYSTEM_USERS);
+
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem(SESSION_KEY);
@@ -270,6 +275,31 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // ── Sync Schools, Classes, and Users from Backend ───────────────────────────
+  useEffect(() => {
+    async function loadBackendMetadata() {
+      try {
+        const [fetchedSchools, fetchedClasses, fetchedUsers] = await Promise.all([
+          api.getSchools().catch(() => null),
+          api.getClasses().catch(() => null),
+          api.getUsers().catch(() => null),
+        ]);
+        if (Array.isArray(fetchedSchools) && fetchedSchools.length > 0) {
+          setSchools(fetchedSchools);
+        }
+        if (Array.isArray(fetchedClasses) && fetchedClasses.length > 0) {
+          setClasses(fetchedClasses);
+        }
+        if (Array.isArray(fetchedUsers) && fetchedUsers.length > 0) {
+          setUsers(fetchedUsers);
+        }
+      } catch (err) {
+        console.warn('Backend metadata load warning:', err.message);
+      }
+    }
+    loadBackendMetadata();
+  }, []);
+
   // ── Resolve Active School Context ───────────────────────────────────────────
   const isPlatformAdmin = Boolean(currentUser?.platformRole === 'super_admin');
 
@@ -277,7 +307,7 @@ export function AuthProvider({ children }) {
     if (!currentUser) return null;
 
     if (isPlatformAdmin) {
-      const found = SEED_SCHOOLS.find(s => s.id === activeSchoolId) || SEED_SCHOOLS[0];
+      const found = schools.find(s => s.id === activeSchoolId) || schools[0] || SEED_SCHOOLS[0];
       return {
         id: found.id,
         name: found.name,
@@ -309,7 +339,7 @@ export function AuthProvider({ children }) {
       status: member.status,
       userRole: member.role,
     };
-  }, [currentUser, activeSchoolId, isPlatformAdmin]);
+  }, [currentUser, activeSchoolId, isPlatformAdmin, schools]);
 
   // ── Resolve Class Assignments for Active School ─────────────────────────────
   const currentSchoolClassAssignments = useMemo(() => {
@@ -317,7 +347,7 @@ export function AuthProvider({ children }) {
 
     if (isPlatformAdmin) {
       // Super admin sees all classes in the selected school
-      return SEED_CLASSES.filter(c => c.schoolId === activeSchool.id).map(c => ({
+      return classes.filter(c => c.schoolId === activeSchool.id).map(c => ({
         id: `sa_${c.id}`,
         classId: c.id,
         className: c.name,
@@ -329,7 +359,7 @@ export function AuthProvider({ children }) {
 
     if (activeSchool.userRole === 'headteacher') {
       // Headteacher sees all classes in their school
-      return SEED_CLASSES.filter(c => c.schoolId === activeSchool.id).map(c => ({
+      return classes.filter(c => c.schoolId === activeSchool.id).map(c => ({
         id: `ht_${c.id}`,
         classId: c.id,
         className: c.name,
@@ -341,7 +371,7 @@ export function AuthProvider({ children }) {
 
     // Teacher: only classes assigned to them in class_memberships for this school
     return (currentUser.classAssignments || []).filter(a => a.schoolId === activeSchool.id);
-  }, [currentUser, activeSchool, isPlatformAdmin]);
+  }, [currentUser, activeSchool, isPlatformAdmin, classes]);
 
   // ── Resolve Active Class ────────────────────────────────────────────────────
   const activeClass = useMemo(() => {
@@ -455,14 +485,14 @@ export function AuthProvider({ children }) {
   // ── Login ───────────────────────────────────────────────────────────────────
   const login = useCallback(async (userId, pin) => {
     setError(null);
-    const user = SYSTEM_USERS.find(u => u.userId === userId);
+    const user = users.find(u => u.userId === userId) || SYSTEM_USERS.find(u => u.userId === userId);
     if (!user) return { success: false, error: 'User account not found.' };
 
     const effective = getEffectivePin(userId);
     if (pin !== effective) return { success: false, error: 'Incorrect PIN.' };
 
     const initialSchoolId = user.platformRole === 'super_admin'
-      ? SEED_SCHOOLS[0].id
+      ? (schools[0]?.id || SEED_SCHOOLS[0].id)
       : (user.memberships?.[0]?.schoolId || null);
 
     const initialClassId = user.classAssignments?.[0]?.classId || null;
@@ -526,7 +556,10 @@ export function AuthProvider({ children }) {
     isHeadteacher,
     isTeacher,
     memberships: currentUser?.memberships || [],
-    availableSchools: isPlatformAdmin ? SEED_SCHOOLS : (currentUser?.memberships || []).map(m => ({
+    schools,
+    classes,
+    users,
+    availableSchools: isPlatformAdmin ? schools : (currentUser?.memberships || []).map(m => ({
       id: m.schoolId,
       name: m.schoolName,
       code: m.schoolCode,
@@ -548,6 +581,9 @@ export function AuthProvider({ children }) {
     isPlatformAdmin,
     isHeadteacher,
     isTeacher,
+    schools,
+    classes,
+    users,
     activeSchool,
     currentSchoolClassAssignments,
     activeClass,
