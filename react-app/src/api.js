@@ -81,6 +81,20 @@ export const api = {
     }
   },
 
+  login: async (userId, pin) => {
+    return request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ userId, pin }),
+    });
+  },
+
+  changePin: async (userId, oldPin, newPin) => {
+    return request('/auth/change-pin', {
+      method: 'POST',
+      body: JSON.stringify({ userId, oldPin, newPin }),
+    });
+  },
+
   // ── Learners ───────────────────────────────────────────────────────────────
   getLearners: async () => {
     if (isSupabaseConfigured()) {

@@ -2,6 +2,14 @@ import React, { useState, useMemo } from 'react';
 import { XIcon } from '../Icons.jsx';
 import { timeLabel } from '../utils/formatters.js';
 
+function maskContact(contact) {
+  if (!contact) return '—';
+  const str = String(contact).trim();
+  if (str.length <= 4) return '••••';
+  const keep = Math.max(2, Math.floor(str.length * 0.25));
+  return str.slice(0, keep) + '•••' + str.slice(-2);
+}
+
 export default function LearnerMemoryModal({ learnerId, schoolMemory, onClose }) {
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'attendance' | 'academic' | 'learning' | 'behaviour' | 'timeline'
 
@@ -75,7 +83,7 @@ export default function LearnerMemoryModal({ learnerId, schoolMemory, onClose })
                 {learner.guardianName && (
                   <div>
                     <small style={{ color: 'var(--muted)', display: 'block', fontSize: 11 }}>Guardian</small>
-                    <strong>{learner.guardianName}</strong> {learner.guardianPhone && <span style={{ color: 'var(--muted)' }}>({learner.guardianPhone})</span>}
+                    <strong>{learner.guardianName}</strong> {learner.guardianPhone && <span style={{ color: 'var(--muted)' }}>({maskContact(learner.guardianPhone)})</span>}
                   </div>
                 )}
                 {learner.email && (

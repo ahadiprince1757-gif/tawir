@@ -58,7 +58,6 @@ export const SYSTEM_USERS = [
     userId:       '00000000-0000-0000-0000-000000000001',
     name:         'Super Admin (Tawi Team)',
     email:        'superadmin@tawi.co',
-    pin:          '9999',
     platformRole: 'super_admin',
     shortTitle:   'Super Admin',
     memberships:  [], // Operates across all schools via platform_admins
@@ -69,7 +68,6 @@ export const SYSTEM_USERS = [
     userId:       '11111111-0000-0000-0000-000000000001',
     name:         'Mr. Peter Omondi',
     email:        'headteacher@stmarys.ac.ke',
-    pin:          '0000',
     platformRole: null,
     shortTitle:   'Headteacher',
     memberships: [
@@ -88,7 +86,6 @@ export const SYSTEM_USERS = [
     userId:       '11111111-0000-0000-0000-000000000002',
     name:         'Jane Muthoni',
     email:        'jane@stmarys.ac.ke',
-    pin:          '1111',
     platformRole: null,
     shortTitle:   'Teacher • Grade 2 Red & Grade 1 Yellow',
     memberships: [
@@ -127,7 +124,6 @@ export const SYSTEM_USERS = [
     userId:       '11111111-0000-0000-0000-000000000003',
     name:         'David Kamau',
     email:        'david@stmarys.ac.ke',
-    pin:          '2222',
     platformRole: null,
     shortTitle:   'Teacher • Grade 3 Blue',
     memberships: [
@@ -157,7 +153,6 @@ export const SYSTEM_USERS = [
     userId:       '11111111-0000-0000-0000-000000000004',
     name:         'Sarah Chebet',
     email:        'sarah@schools.ac.ke',
-    pin:          '3333',
     platformRole: null,
     shortTitle:   'Teacher • Multi-School',
     memberships: [
@@ -203,7 +198,6 @@ export const SYSTEM_USERS = [
     userId:       '22222222-0000-0000-0000-000000000001',
     name:         'John Odhiambo',
     email:        'john@greenwood.ac.ke',
-    pin:          '4444',
     platformRole: null,
     shortTitle:   'Teacher • Greenwood Primary',
     memberships: [
@@ -230,22 +224,6 @@ export const SYSTEM_USERS = [
 ];
 
 const SESSION_KEY = 'tawi_auth_session_v2';
-const PINS_KEY    = 'tawi_pins_v2';
-
-function loadPinOverrides() {
-  try {
-    const raw = localStorage.getItem(PINS_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function getEffectivePin(userId) {
-  const overrides = loadPinOverrides();
-  const user = SYSTEM_USERS.find(u => u.userId === userId);
-  return overrides[userId] || user?.pin || null;
-}
 
 // ── AUTH CONTEXT ───────────────────────────────────────────────────────────────
 
@@ -482,43 +460,43 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // ── Login ───────────────────────────────────────────────────────────────────
+  // ── Login (Backend Server Authentication) ───────────────────────────────────
   const login = useCallback(async (userId, pin) => {
     setError(null);
-    const user = users.find(u => u.userId === userId) || SYSTEM_USERS.find(u => u.userId === userId);
-    if (!user) return { success: false, error: 'User account not found.' };
+    try {
+      const res = await api.login(userId, pin);
+      if (res && res.success && res.user) {
+        const user = res.user;
+        const initialSchoolId = res.activeSchoolId || user.memberships?.[0]?.schoolId || null;
+        const initialClassId = res.activeClassId || user.classAssignments?.[0]?.classId || null;
 
-    const effective = getEffectivePin(userId);
-    if (pin !== effective) return { success: false, error: 'Incorrect PIN.' };
+        const session = {
+          userId:           user.userId,
+          name:             user.name,
+          email:            user.email,
+          platformRole:     user.platformRole,
+          memberships:      user.memberships || [],
+          classAssignments: user.classAssignments || [],
+          shortTitle:       user.shortTitle,
+          activeSchoolId:   initialSchoolId,
+          activeClassId:    initialClassId,
+          // Backward-compatible fields
+          role:             user.platformRole || user.memberships?.[0]?.role || 'teacher',
+          className:        user.classAssignments?.[0]?.className || null,
+          classId:          initialClassId,
+        };
 
-    const initialSchoolId = user.platformRole === 'super_admin'
-      ? (schools[0]?.id || SEED_SCHOOLS[0].id)
-      : (user.memberships?.[0]?.schoolId || null);
+        setCurrentUser(session);
+        setActiveSchoolIdState(initialSchoolId);
+        setActiveClassIdState(initialClassId);
+        localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 
-    const initialClassId = user.classAssignments?.[0]?.classId || null;
-
-    const session = {
-      userId:           user.userId,
-      name:             user.name,
-      email:            user.email,
-      platformRole:     user.platformRole,
-      memberships:      user.memberships,
-      classAssignments: user.classAssignments || [],
-      shortTitle:       user.shortTitle,
-      activeSchoolId:   initialSchoolId,
-      activeClassId:    initialClassId,
-      // Backward-compatible fields
-      role:             user.platformRole || user.memberships?.[0]?.role || 'teacher',
-      className:        user.classAssignments?.[0]?.className || null,
-      classId:          initialClassId,
-    };
-
-    setCurrentUser(session);
-    setActiveSchoolIdState(initialSchoolId);
-    setActiveClassIdState(initialClassId);
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-
-    return { success: true };
+        return { success: true };
+      }
+      return { success: false, error: res?.error || 'Authentication failed.' };
+    } catch (err) {
+      return { success: false, error: err.message || 'Incorrect PIN or server offline.' };
+    }
   }, []);
 
   const logout = useCallback(() => {
@@ -531,17 +509,17 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const changePin = useCallback((currentPin, newPin) => {
+  const changePin = useCallback(async (currentPin, newPin) => {
     if (!currentUser) return { success: false, error: 'Not signed in.' };
-    const effective = getEffectivePin(currentUser.userId);
-    if (currentPin !== effective) return { success: false, error: 'Current PIN is incorrect.' };
-    if (!/^\d{4}$/.test(newPin)) return { success: false, error: 'New PIN must be exactly 4 digits.' };
-    if (newPin === currentPin) return { success: false, error: 'New PIN must be different from current PIN.' };
-
-    const overrides = loadPinOverrides();
-    overrides[currentUser.userId] = newPin;
-    localStorage.setItem(PINS_KEY, JSON.stringify(overrides));
-    return { success: true };
+    try {
+      const res = await api.changePin(currentUser.userId, currentPin, newPin);
+      if (res && res.success) {
+        return { success: true, message: res.message };
+      }
+      return { success: false, error: res?.error || 'Failed to update PIN.' };
+    } catch (err) {
+      return { success: false, error: err.message || 'Failed to update PIN.' };
+    }
   }, [currentUser]);
 
   // Derived role helpers

@@ -3,6 +3,20 @@ import { searchLearners } from '../core/learners/learnerMatcher.js';
 import AddLearnerModal from '../components/AddLearnerModal.jsx';
 import { TrashIcon } from '../Icons.jsx';
 
+function maskContact(contact) {
+  if (!contact) return '—';
+  const str = String(contact).trim();
+  if (str.includes('@')) {
+    const [name, domain] = str.split('@');
+    if (name.length <= 2) return `${name}*@${domain}`;
+    return `${name[0]}••••${name.slice(-1)}@${domain}`;
+  }
+  if (str.length <= 6) return str;
+  const start = str.slice(0, str.startsWith('+') ? 7 : 4);
+  const end = str.slice(-3);
+  return `${start} ••• ${end}`;
+}
+
 export default function LearnersView({
   learners,
   schoolMemory,
@@ -380,7 +394,7 @@ export default function LearnersView({
                         </span>
                       </td>
                       <td style={{ fontSize: 12, color: 'var(--muted)' }} className={selectedCol === 'contact' ? 'sheet-cell-col-selected' : ''}>
-                        {learner.guardianPhone || learner.email || '—'}
+                        {maskContact(learner.guardianPhone || learner.email)}
                       </td>
                       <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                         <button

@@ -112,12 +112,8 @@ export default function ChangePinModal({ isOpen, onClose }) {
 
   const advance = (pin) => {
     // Small delay so user sees the 4th dot fill before advancing
-    setTimeout(() => {
+    setTimeout(async () => {
       if (step === 1) {
-        // Validate current PIN against stored PIN
-        const result = changePin(pin, '____PROBE____'); // probe: will fail on new PIN check only
-        // We just want to check the current PIN — do it ourselves
-        // Actually, let's just move to step 2 and let changePin validate at the end
         setStep(2);
         setNewPin('');
       } else if (step === 2) {
@@ -140,12 +136,12 @@ export default function ChangePinModal({ isOpen, onClose }) {
           setConfirmPin('');
           return;
         }
-        // Commit
-        const result = changePin(currentPin, newPin);
+        // Commit via backend authentication
+        const result = await changePin(currentPin, newPin);
         if (!result.success) {
           setError(result.error || 'Could not change PIN.');
           // If current PIN was wrong, go back to step 1
-          if (result.error?.includes('Current PIN')) {
+          if (result.error?.toLowerCase().includes('current pin')) {
             setStep(1);
             setCurrentPin('');
             setNewPin('');

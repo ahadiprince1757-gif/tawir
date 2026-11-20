@@ -84,16 +84,20 @@ export default function LoginView() {
     }
   };
 
-  const attemptLogin = (userId, pinValue) => {
+  const attemptLogin = async (userId, pinValue) => {
     setLoading(true);
-    setTimeout(() => {
-      const result = login(userId, pinValue);
+    try {
+      const result = await login(userId, pinValue);
       if (!result.success) {
         setError(result.error || 'Incorrect PIN.');
         setPin('');
       }
+    } catch (err) {
+      setError(err.message || 'Authentication error.');
+      setPin('');
+    } finally {
       setLoading(false);
-    }, 300); // small delay so user sees feedback
+    }
   };
 
   return (

@@ -58,10 +58,79 @@ app.get('/api/classes', (req, res) => {
   res.json(classes);
 });
 
-// Users & Roles
+// Users & Roles (Sensitive credential fields stripped)
 app.get('/api/users', (req, res) => {
   const db = readDb();
-  res.json(db.users || []);
+  // Never expose PINs or credentials to the client
+  const safeUsers = (db.users || []).map(({ pin, ...safeUser }) => safeUser);
+  res.json(safeUsers);
+});
+
+// Authentication: Secure Server-Side Login
+app.post('/api/auth/login', (req, res) => {
+  const { userId, pin } = req.body;
+  if (!userId || !pin) {
+    return res.status(400).json({ success: false, error: 'User ID and PIN are required.' });
+  }
+
+  const db = readDb();
+  const users = db.users || [];
+  const user = users.find(u => u.userId === userId);
+
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'User account not found.' });
+  }
+
+  if (String(user.pin).trim() !== String(pin).trim()) {
+    return res.status(401).json({ success: false, error: 'Incorrect PIN.' });
+  }
+
+  // Return authenticated user without the sensitive PIN field
+  const { pin: _p, ...safeUser } = user;
+  const initialSchoolId = safeUser.platformRole === 'super_admin'
+    ? (db.schools?.[0]?.id || '11111111-1111-1111-1111-111111111111')
+    : (safeUser.memberships?.[0]?.schoolId || null);
+
+  const initialClassId = safeUser.classAssignments?.[0]?.classId || null;
+
+  res.json({
+    success: true,
+    user: safeUser,
+    activeSchoolId: initialSchoolId,
+    activeClassId: initialClassId,
+  });
+});
+
+// Authentication: Secure Server-Side PIN Update
+app.post('/api/auth/change-pin', (req, res) => {
+  const { userId, oldPin, newPin } = req.body;
+  if (!userId || !oldPin || !newPin) {
+    return res.status(400).json({ success: false, error: 'User ID, current PIN, and new PIN are required.' });
+  }
+
+  if (!/^\d{4}$/.test(String(newPin).trim())) {
+    return res.status(400).json({ success: false, error: 'New PIN must be exactly 4 digits.' });
+  }
+
+  const db = readDb();
+  const user = (db.users || []).find(u => u.userId === userId);
+
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'User account not found.' });
+  }
+
+  if (String(user.pin).trim() !== String(oldPin).trim()) {
+    return res.status(401).json({ success: false, error: 'Current PIN is incorrect.' });
+  }
+
+  if (String(oldPin).trim() === String(newPin).trim()) {
+    return res.status(400).json({ success: false, error: 'New PIN must be different from your current PIN.' });
+  }
+
+  user.pin = String(newPin).trim();
+  writeDb(db);
+
+  res.json({ success: true, message: 'PIN changed successfully.' });
 });
 
 // Learners (Unified entity)
