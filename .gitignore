@@ -7,10 +7,10 @@ dist/
 build/
 react-app/dist/
 
-# Environment files
-.env
-.env.local
-.env.*.local
+# Environment files - ignore all env files and examples
+.env*
+*.env*
+**/.env*
 
 # Logs
 npm-debug.log*
