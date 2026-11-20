@@ -45,12 +45,20 @@ export function toDbLearner(l) {
   };
 }
 
+const CLASS_NAME_FALLBACKS = {
+  'c1000000-0000-0000-0000-000000000001': 'PP1 Yellow',
+  'c1000000-0000-0000-0000-000000000002': 'Grade 1 Yellow',
+  'c1000000-0000-0000-0000-000000000003': 'Grade 2 Red',
+  'c1000000-0000-0000-0000-000000000004': 'Grade 3 Blue',
+  'c1000000-0000-0000-0000-000000000005': 'Grade 4 Blue',
+};
+
 export function fromDbLearner(row) {
   return {
     id: row.id,
     schoolId: row.school_id,
     classId: row.class_id,
-    className: row.classes ? row.classes.name : (row.class_name || 'General'),
+    className: row.classes ? row.classes.name : (row.class_name || CLASS_NAME_FALLBACKS[row.class_id] || 'General'),
     admissionNumber: row.admission_number || '',
     fullName: row.full_name || '',
     gender: row.gender || '',

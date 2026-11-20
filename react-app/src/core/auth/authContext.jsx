@@ -41,13 +41,14 @@ export const SEED_SCHOOLS = [
 ];
 
 export const SEED_CLASSES = [
-  // St. Mary's Classes
-  { id: 'cls_st_marys_g2_red',    schoolId: '11111111-1111-1111-1111-111111111111', name: 'Grade 2 Red',    gradeLevel: 'Grade 2', stream: 'Red' },
-  { id: 'cls_st_marys_g1_yellow', schoolId: '11111111-1111-1111-1111-111111111111', name: 'Grade 1 Yellow', gradeLevel: 'Grade 1', stream: 'Yellow' },
-  { id: 'cls_st_marys_g3_blue',   schoolId: '11111111-1111-1111-1111-111111111111', name: 'Grade 3 Blue',   gradeLevel: 'Grade 3', stream: 'Blue' },
-  { id: 'cls_st_marys_g4_blue',   schoolId: '11111111-1111-1111-1111-111111111111', name: 'Grade 4 Blue',   gradeLevel: 'Grade 4', stream: 'Blue' },
+  // St. Mary's Classes (Fixed UUIDs matching PostgreSQL / Supabase seed)
+  { id: 'c1000000-0000-0000-0000-000000000001', schoolId: '11111111-1111-1111-1111-111111111111', name: 'PP1 Yellow',     gradeLevel: 'PP1',     stream: 'Yellow' },
+  { id: 'c1000000-0000-0000-0000-000000000002', schoolId: '11111111-1111-1111-1111-111111111111', name: 'Grade 1 Yellow', gradeLevel: 'Grade 1', stream: 'Yellow' },
+  { id: 'c1000000-0000-0000-0000-000000000003', schoolId: '11111111-1111-1111-1111-111111111111', name: 'Grade 2 Red',    gradeLevel: 'Grade 2', stream: 'Red' },
+  { id: 'c1000000-0000-0000-0000-000000000004', schoolId: '11111111-1111-1111-1111-111111111111', name: 'Grade 3 Blue',   gradeLevel: 'Grade 3', stream: 'Blue' },
+  { id: 'c1000000-0000-0000-0000-000000000005', schoolId: '11111111-1111-1111-1111-111111111111', name: 'Grade 4 Blue',   gradeLevel: 'Grade 4', stream: 'Blue' },
   // Greenwood Classes
-  { id: 'cls_greenwood_g2_blue',  schoolId: '22222222-2222-2222-2222-222222222222', name: 'Grade 2 Blue',   gradeLevel: 'Grade 2', stream: 'Blue' },
+  { id: 'c2000000-0000-0000-0000-000000000001', schoolId: '22222222-2222-2222-2222-222222222222', name: 'Grade 2 Blue',   gradeLevel: 'Grade 2', stream: 'Blue' },
 ];
 
 export const SYSTEM_USERS = [
@@ -102,7 +103,7 @@ export const SYSTEM_USERS = [
       {
         id:         'assign_jane_g2',
         schoolId:   '11111111-1111-1111-1111-111111111111',
-        classId:    'cls_st_marys_g2_red',
+        classId:    'c1000000-0000-0000-0000-000000000003',
         className:  'Grade 2 Red',
         gradeLevel: 'Grade 2',
         stream:     'Red',
@@ -111,7 +112,7 @@ export const SYSTEM_USERS = [
       {
         id:         'assign_jane_g1',
         schoolId:   '11111111-1111-1111-1111-111111111111',
-        classId:    'cls_st_marys_g1_yellow',
+        classId:    'c1000000-0000-0000-0000-000000000002',
         className:  'Grade 1 Yellow',
         gradeLevel: 'Grade 1',
         stream:     'Yellow',
@@ -141,7 +142,7 @@ export const SYSTEM_USERS = [
       {
         id:         'assign_david_g3',
         schoolId:   '11111111-1111-1111-1111-111111111111',
-        classId:    'cls_st_marys_g3_blue',
+        classId:    'c1000000-0000-0000-0000-000000000004',
         className:  'Grade 3 Blue',
         gradeLevel: 'Grade 3',
         stream:     'Blue',
@@ -178,7 +179,7 @@ export const SYSTEM_USERS = [
       {
         id:         'assign_sarah_stmarys_g1',
         schoolId:   '11111111-1111-1111-1111-111111111111',
-        classId:    'cls_st_marys_g1_yellow',
+        classId:    'c1000000-0000-0000-0000-000000000002',
         className:  'Grade 1 Yellow',
         gradeLevel: 'Grade 1',
         stream:     'Yellow',
@@ -187,7 +188,7 @@ export const SYSTEM_USERS = [
       {
         id:         'assign_sarah_greenwood_g2',
         schoolId:   '22222222-2222-2222-2222-222222222222',
-        classId:    'cls_greenwood_g2_blue',
+        classId:    'c2000000-0000-0000-0000-000000000001',
         className:  'Grade 2 Blue',
         gradeLevel: 'Grade 2',
         stream:     'Blue',
@@ -217,7 +218,7 @@ export const SYSTEM_USERS = [
       {
         id:         'assign_john_greenwood_g2',
         schoolId:   '22222222-2222-2222-2222-222222222222',
-        classId:    'cls_greenwood_g2_blue',
+        classId:    'c2000000-0000-0000-0000-000000000001',
         className:  'Grade 2 Blue',
         gradeLevel: 'Grade 2',
         stream:     'Blue',
