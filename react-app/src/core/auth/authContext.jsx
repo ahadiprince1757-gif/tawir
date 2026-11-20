@@ -24,7 +24,7 @@ export const SEED_SCHOOLS = [
   {
     id:     '11111111-1111-1111-1111-111111111111',
     code:   'ST_MARYS_001',
-    name:   "St. Mary's Academy",
+    name:   "St. Mary's Primary School",
     status: 'live',
   },
   {
@@ -64,7 +64,7 @@ export const SYSTEM_USERS = [
     memberships:  [], // Operates across all schools via platform_admins
   },
 
-  // 2. Headteacher - St. Mary's Academy
+  // 2. Headteacher - St. Mary's Primary School
   {
     userId:       '11111111-0000-0000-0000-000000000001',
     name:         'Mr. Peter Omondi',
@@ -75,7 +75,7 @@ export const SYSTEM_USERS = [
     memberships: [
       {
         schoolId:   '11111111-1111-1111-1111-111111111111',
-        schoolName: "St. Mary's Academy",
+        schoolName: "St. Mary's Primary School",
         schoolCode: 'ST_MARYS_001',
         role:       'headteacher',
         status:     'live',
@@ -94,7 +94,7 @@ export const SYSTEM_USERS = [
     memberships: [
       {
         schoolId:   '11111111-1111-1111-1111-111111111111',
-        schoolName: "St. Mary's Academy",
+        schoolName: "St. Mary's Primary School",
         schoolCode: 'ST_MARYS_001',
         role:       'teacher',
         status:     'live',
@@ -133,7 +133,7 @@ export const SYSTEM_USERS = [
     memberships: [
       {
         schoolId:   '11111111-1111-1111-1111-111111111111',
-        schoolName: "St. Mary's Academy",
+        schoolName: "St. Mary's Primary School",
         schoolCode: 'ST_MARYS_001',
         role:       'teacher',
         status:     'live',
@@ -163,7 +163,7 @@ export const SYSTEM_USERS = [
     memberships: [
       {
         schoolId:   '11111111-1111-1111-1111-111111111111',
-        schoolName: "St. Mary's Academy",
+        schoolName: "St. Mary's Primary School",
         schoolCode: 'ST_MARYS_001',
         role:       'teacher',
         status:     'live',
