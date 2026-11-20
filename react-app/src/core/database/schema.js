@@ -34,6 +34,7 @@ export const INCIDENT_ACTIONS = {
 
 export function createLearner({
   id,
+  schoolId = '11111111-1111-1111-1111-111111111111',
   admissionNumber = '',
   firstName = '',
   lastName = '',
@@ -56,6 +57,7 @@ export function createLearner({
 
   return {
     id: id || `learner_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    schoolId: String(schoolId),
     admissionNumber: String(admissionNumber).trim(),
     firstName: cleanFirst || computedFullName.split(' ')[0] || '',
     lastName: cleanLast || computedFullName.split(' ').slice(1).join(' ') || '',
@@ -76,6 +78,7 @@ export function createLearner({
 
 export function createEvent({
   id,
+  schoolId = '11111111-1111-1111-1111-111111111111',
   type = EVENT_TYPES.NOTE,
   action = 'general',
   learnerId = null,
@@ -93,6 +96,7 @@ export function createEvent({
 }) {
   return {
     id: id || `ev_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    schoolId: String(schoolId),
     type,
     action,
     learnerId,

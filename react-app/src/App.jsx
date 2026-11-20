@@ -22,11 +22,24 @@ import TodayView from './views/TodayView.jsx';
 import LearnersView from './views/LearnersView.jsx';
 import EventTimelineView from './views/EventTimelineView.jsx';
 import SmartSheetView from './views/SmartSheetView.jsx';
-import ScannerView from './views/ScannerView.jsx';
 
 export default function App() {
-  const { currentUser, logout } = useAuth();
-  const perms = useMemo(() => getPermissions(currentUser), [currentUser]);
+  const auth = useAuth();
+  const {
+    currentUser,
+    isPlatformAdmin,
+    isHeadteacher,
+    isTeacher,
+    activeSchool,
+    availableSchools,
+    setActiveSchoolId,
+    classAssignments,
+    activeClass,
+    setActiveClassId,
+    logout,
+  } = auth;
+
+  const perms = useMemo(() => getPermissions(auth), [auth]);
 
   const [view, setView] = useState('today');
   const [toastMessage, setToastMessage] = useState('');
@@ -45,32 +58,54 @@ export default function App() {
     return saved && JSON.parse(saved).length > 0 ? JSON.parse(saved) : getMockEvents();
   });
 
-  // ── Scoping: teacher sees only their class; headteacher sees all ─────────────
+  // ── Scoping: Multi-Tenant School & Class Relational Boundary ─────────────────
   const scopedLearners = useMemo(() => {
-    if (!currentUser) return [];
-    if (currentUser.role === 'headteacher') return learners;
-    return learners.filter((l) => l.className === currentUser.className);
-  }, [learners, currentUser]);
+    if (!currentUser || !activeSchool) return [];
+
+    // Rule 1: Tenant Boundary (School isolation)
+    const schoolLearners = learners.filter(
+      (l) => (l.schoolId || l.school_id) === activeSchool.id
+    );
+
+    // Platform Admin & Headteacher: see all learners across the active school
+    if (isPlatformAdmin || isHeadteacher) {
+      return schoolLearners;
+    }
+
+    // Teacher: only learners belonging to the teacher's active assigned class
+    const targetClassId = activeClass?.classId || classAssignments[0]?.classId;
+    if (!targetClassId) return [];
+
+    return schoolLearners.filter(
+      (l) => (l.classId || l.class_id) === targetClassId
+    );
+  }, [learners, currentUser, activeSchool, isPlatformAdmin, isHeadteacher, activeClass, classAssignments]);
 
   const scopedEvents = useMemo(() => {
-    if (!currentUser) return [];
-    if (currentUser.role === 'headteacher') return events;
+    if (!currentUser || !activeSchool) return [];
+
+    // Rule 1: Tenant Boundary (School isolation)
+    const schoolEvents = events.filter(
+      (e) => (e.schoolId || e.school_id) === activeSchool.id
+    );
+
+    // Platform Admin & Headteacher: see all events across the active school
+    if (isPlatformAdmin || isHeadteacher) {
+      return schoolEvents;
+    }
+
+    // Teacher: events for learners in their active assigned class
     const studentIds = new Set(scopedLearners.map((l) => l.id));
-    return events.filter(
+    const targetClassId = activeClass?.classId || classAssignments[0]?.classId;
+
+    return schoolEvents.filter(
       (e) =>
         (e.learnerId && studentIds.has(e.learnerId)) ||
-        e.className === currentUser.className
+        (e.classId && e.classId === targetClassId)
     );
-  }, [events, scopedLearners, currentUser]);
+  }, [events, currentUser, activeSchool, isPlatformAdmin, isHeadteacher, scopedLearners, activeClass, classAssignments]);
 
-  // Available classes for headteacher UI only
-  const availableClasses = useMemo(() => {
-    const set = new Set();
-    learners.forEach((l) => { if (l.className) set.add(l.className); });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  }, [learners]);
-
-  // School memory — always scoped
+  // Unified School Memory instance (scoped to active tenant)
   const schoolMemory = useMemo(() => {
     return new SchoolMemory(scopedLearners, scopedEvents);
   }, [scopedLearners, scopedEvents]);
@@ -102,23 +137,24 @@ export default function App() {
   useEffect(() => { localStorage.setItem('school_memory_learners', JSON.stringify(learners)); }, [learners]);
   useEffect(() => { localStorage.setItem('school_memory_events', JSON.stringify(events)); }, [events]);
 
-  // ── Helpers ───────────────────────────────────────────────────────────────────
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 2500);
   };
 
-  // Ownership stamp — attaches the logged-in user to every new event
+  // Ownership stamp — attaches school_id, class_id, and user_id to every new event
   const ownershipFields = useMemo(() => ({
+    schoolId:        activeSchool?.id    || null,
+    classId:         activeClass?.classId || null,
+    className:       activeClass?.name   || null,
     createdByUserId: currentUser?.userId || null,
     createdByName:   currentUser?.name   || null,
-    createdByRole:   currentUser?.role   || null,
-  }), [currentUser]);
+    createdByRole:   isPlatformAdmin ? 'super_admin' : isHeadteacher ? 'headteacher' : 'teacher',
+  }), [activeSchool, activeClass, currentUser, isPlatformAdmin, isHeadteacher]);
 
   // ── Event handlers ────────────────────────────────────────────────────────────
   const handleCommitEvent = async (newEvent) => {
-    // Stamp ownership if not already set
-    const stamped = { ...newEvent, ...ownershipFields };
+    const stamped = { ...ownershipFields, ...newEvent };
     setEvents((prev) => [stamped, ...prev]);
     try {
       await api.createEvent(stamped);
@@ -136,7 +172,7 @@ export default function App() {
     if (existingIndex >= 0) {
       const existing = events[existingIndex];
       // Teachers can only undo their own attendance marks
-      if (!perms.isHeadteacher && existing.createdByUserId && existing.createdByUserId !== currentUser?.userId) {
+      if (!isPlatformAdmin && !isHeadteacher && existing.createdByUserId && existing.createdByUserId !== currentUser?.userId) {
         showToast('You can only change attendance records you created.');
         return;
       }
@@ -149,8 +185,9 @@ export default function App() {
         type: 'attendance',
         action: 'absent',
         learnerId,
-        className: learner?.className || currentUser?.className || null,
-        classId:   learner?.classId   || currentUser?.classId   || null,
+        schoolId:  activeSchool?.id,
+        classId:   learner?.classId   || activeClass?.classId || null,
+        className: learner?.className || activeClass?.name    || null,
         date: dateKey,
         source: 'Register checklist toggle',
         ...ownershipFields,
@@ -167,13 +204,25 @@ export default function App() {
   };
 
   const handleImportLearners = async (newLearners, newEvents = []) => {
-    setLearners((prev) => [...prev, ...newLearners]);
+    const stampedLearners = newLearners.map(l => ({
+      ...l,
+      schoolId: activeSchool?.id,
+      classId:  l.classId || activeClass?.classId,
+    }));
+
+    setLearners((prev) => [...prev, ...stampedLearners]);
+
     if (newEvents && newEvents.length > 0) {
-      const stamped = newEvents.map(e => ({ ...e, ...ownershipFields }));
-      setEvents((prev) => [...stamped, ...prev]);
+      const stampedEvents = newEvents.map(e => ({
+        ...e,
+        schoolId: activeSchool?.id,
+        ...ownershipFields,
+      }));
+      setEvents((prev) => [...stampedEvents, ...prev]);
     }
+
     try {
-      await api.addLearners(newLearners);
+      await api.addLearners(stampedLearners);
       if (newEvents && newEvents.length > 0) {
         await Promise.allSettled(newEvents.map((ev) => api.createEvent(ev)));
       }
@@ -185,7 +234,7 @@ export default function App() {
 
   const handleDeleteEvent = async (eventId) => {
     const event = events.find(e => e.id === eventId);
-    if (event && !perms.isHeadteacher && event.createdByUserId !== currentUser?.userId) {
+    if (event && !isPlatformAdmin && !isHeadteacher && event.createdByUserId !== currentUser?.userId) {
       showToast('You can only delete records you created.');
       return;
     }
@@ -201,8 +250,7 @@ export default function App() {
 
   const handleDeleteEventsBatch = async (ids) => {
     if (!ids || ids.length === 0) return;
-    // For teachers: filter to only their own events
-    const allowedIds = perms.isHeadteacher
+    const allowedIds = (isPlatformAdmin || isHeadteacher)
       ? ids
       : ids.filter(id => {
           const ev = events.find(e => e.id === id);
@@ -226,7 +274,7 @@ export default function App() {
 
   const handleDeleteLearners = async (ids) => {
     if (!perms.canDeleteLearner) {
-      showToast('Only the headteacher can remove learners.');
+      showToast('Only the headteacher or platform administrator can remove learners.');
       return;
     }
     if (!ids || ids.length === 0) return;
@@ -245,7 +293,7 @@ export default function App() {
 
   const handleClearColumn = async (colKey, affectedIds) => {
     if (!perms.canEditLearnerProfile) {
-      showToast('Only the headteacher can clear learner data columns.');
+      showToast('Only the headteacher or platform administrator can clear learner data columns.');
       return;
     }
     if (!colKey) return;
@@ -271,7 +319,7 @@ export default function App() {
 
   const handleClearAllEvents = async () => {
     if (!perms.canEraseAllData) {
-      showToast('Only the headteacher can erase all events.');
+      showToast('Only the headteacher or platform administrator can erase all events.');
       return;
     }
     setEvents([]);
@@ -282,7 +330,7 @@ export default function App() {
 
   const handleResetSystem = async () => {
     if (!perms.canResetSystem) {
-      showToast('Only the headteacher can reset the system.');
+      showToast('Only the headteacher or platform administrator can reset the system.');
       return;
     }
     const mockLearners = getMockLearners();
@@ -291,7 +339,7 @@ export default function App() {
     setEvents(mockEvents);
     localStorage.setItem('school_memory_learners', JSON.stringify(mockLearners));
     localStorage.setItem('school_memory_events', JSON.stringify(mockEvents));
-    showToast('Demo data loaded!');
+    showToast('Demo data loaded for active school!');
   };
 
   // ── Gate: show login screen if not authenticated ──────────────────────────────
@@ -304,6 +352,7 @@ export default function App() {
         onNavigate={setView}
         backendConnected={backendConnected}
         currentUser={currentUser}
+        activeSchool={activeSchool}
         onLogout={logout}
         onOpenEraseModal={perms.canEraseAllData ? () => setIsEraseModalOpen(true) : null}
       />
@@ -314,6 +363,15 @@ export default function App() {
         backendConnected={backendConnected}
         learnerCount={scopedLearners.length}
         currentUser={currentUser}
+        activeSchool={activeSchool}
+        availableSchools={availableSchools}
+        onSelectSchool={setActiveSchoolId}
+        classAssignments={classAssignments}
+        activeClass={activeClass}
+        onSelectClass={setActiveClassId}
+        isPlatformAdmin={isPlatformAdmin}
+        isHeadteacher={isHeadteacher}
+        isTeacher={isTeacher}
         onLogout={logout}
         onOpenEraseModal={perms.canEraseAllData ? () => setIsEraseModalOpen(true) : null}
       />
@@ -331,6 +389,10 @@ export default function App() {
             learners={scopedLearners}
             events={scopedEvents}
             currentUser={currentUser}
+            activeSchool={activeSchool}
+            activeClass={activeClass}
+            classAssignments={classAssignments}
+            onSelectClass={setActiveClassId}
             onCommitEvent={handleCommitEvent}
             onToggleAttendance={handleToggleAttendance}
             onSelectLearner={(id) => setSelectedLearnerId(id)}
@@ -364,23 +426,16 @@ export default function App() {
           />
         )}
 
+        {/* Smart Sheet (Bulk Ingestion for Super Admin / Headteacher) */}
         {view === 'smartsheet' && (
           <SmartSheetView
             existingLearners={scopedLearners}
             currentUser={currentUser}
+            activeSchool={activeSchool}
+            activeClass={activeClass}
             onImportRecords={handleImportLearners}
             onToast={showToast}
             onNavigate={setView}
-          />
-        )}
-
-        {/* Deprecated/Hidden Scanner preserved as experimental */}
-        {view === 'scanner' && (
-          <ScannerView
-            existingLearners={learners}
-            currentUser={currentUser}
-            onImportLearners={handleImportLearners}
-            onToast={showToast}
           />
         )}
       </main>
@@ -390,6 +445,9 @@ export default function App() {
         onNavigate={setView}
         learnerCount={scopedLearners.length}
         currentUser={currentUser}
+        isPlatformAdmin={isPlatformAdmin}
+        isHeadteacher={isHeadteacher}
+        isTeacher={isTeacher}
       />
 
       {selectedLearnerId && (

@@ -152,15 +152,20 @@ export default function LoginView() {
               cursor: 'pointer',
             }}
           >
-            <option value="">Select your name…</option>
-            <optgroup label="School Leadership">
-              {SYSTEM_USERS.filter(u => u.role === 'headteacher').map(u => (
-                <option key={u.userId} value={u.userId}>{u.name} — Headteacher</option>
+            <option value="">Select your account…</option>
+            <optgroup label="Platform Administration">
+              {SYSTEM_USERS.filter(u => u.platformRole === 'super_admin').map(u => (
+                <option key={u.userId} value={u.userId}>{u.name}</option>
               ))}
             </optgroup>
-            <optgroup label="Class Teachers">
-              {SYSTEM_USERS.filter(u => u.role === 'teacher').map(u => (
-                <option key={u.userId} value={u.userId}>{u.name} — {u.className}</option>
+            <optgroup label="School Leadership">
+              {SYSTEM_USERS.filter(u => u.memberships?.some(m => m.role === 'headteacher')).map(u => (
+                <option key={u.userId} value={u.userId}>{u.name} — Headteacher ({u.memberships[0]?.schoolName})</option>
+              ))}
+            </optgroup>
+            <optgroup label="Teachers">
+              {SYSTEM_USERS.filter(u => !u.platformRole && !u.memberships?.some(m => m.role === 'headteacher')).map(u => (
+                <option key={u.userId} value={u.userId}>{u.name} — {u.shortTitle}</option>
               ))}
             </optgroup>
           </select>

@@ -15,6 +15,8 @@ export function getMockLearners() {
   return [
     createLearner({
       id: 'learner_brian_01',
+      schoolId: '11111111-1111-1111-1111-111111111111',
+      classId: 'cls_st_marys_g3_blue',
       admissionNumber: '3021',
       firstName: 'Brian',
       lastName: 'Mwangi',
@@ -28,6 +30,8 @@ export function getMockLearners() {
     }),
     createLearner({
       id: 'learner_amina_02',
+      schoolId: '11111111-1111-1111-1111-111111111111',
+      classId: 'cls_st_marys_g2_red',
       admissionNumber: '3022',
       firstName: 'Amina',
       lastName: 'Hassan',
@@ -41,6 +45,8 @@ export function getMockLearners() {
     }),
     createLearner({
       id: 'learner_kevin_03',
+      schoolId: '11111111-1111-1111-1111-111111111111',
+      classId: 'cls_st_marys_g4_blue',
       admissionNumber: '3023',
       firstName: 'Kevin',
       lastName: 'Kiprono',
@@ -54,6 +60,8 @@ export function getMockLearners() {
     }),
     createLearner({
       id: 'learner_faith_04',
+      schoolId: '11111111-1111-1111-1111-111111111111',
+      classId: 'cls_st_marys_g1_yellow',
       admissionNumber: '3024',
       firstName: 'Faith',
       lastName: 'Muthoni',
@@ -67,6 +75,8 @@ export function getMockLearners() {
     }),
     createLearner({
       id: 'learner_david_05',
+      schoolId: '11111111-1111-1111-1111-111111111111',
+      classId: 'cls_st_marys_g3_blue',
       admissionNumber: '3025',
       firstName: 'David',
       lastName: 'Ochieng',
@@ -80,6 +90,8 @@ export function getMockLearners() {
     }),
     createLearner({
       id: 'learner_mercy_06',
+      schoolId: '11111111-1111-1111-1111-111111111111',
+      classId: 'cls_st_marys_g3_blue',
       admissionNumber: '3026',
       firstName: 'Mercy',
       lastName: 'Chebet',
@@ -93,6 +105,8 @@ export function getMockLearners() {
     }),
     createLearner({
       id: 'learner_john_07',
+      schoolId: '11111111-1111-1111-1111-111111111111',
+      classId: 'cls_st_marys_g3_blue',
       admissionNumber: '3027',
       firstName: 'John',
       lastName: 'Kamau',
@@ -106,6 +120,8 @@ export function getMockLearners() {
     }),
     createLearner({
       id: 'learner_sharon_08',
+      schoolId: '11111111-1111-1111-1111-111111111111',
+      classId: 'cls_st_marys_g2_red',
       admissionNumber: '3028',
       firstName: 'Sharon',
       lastName: 'Auma',
@@ -116,6 +132,37 @@ export function getMockLearners() {
       dateOfBirth: '2017-03-11',
       guardianName: 'Lilian Otieno',
       guardianPhone: '+254789012345',
+    }),
+    // ── School Beta: Greenwood Primary Learners (For cross-school tenant testing) ─
+    createLearner({
+      id: 'learner_greenwood_01',
+      schoolId: '22222222-2222-2222-2222-222222222222',
+      classId: 'cls_greenwood_g2_blue',
+      admissionNumber: 'GW-101',
+      firstName: 'Samuel',
+      lastName: 'Karanja',
+      fullName: 'Samuel Karanja',
+      className: 'Grade 2 Blue',
+      section: 'A',
+      gender: 'Male',
+      dateOfBirth: '2017-05-14',
+      guardianName: 'Mary Karanja',
+      guardianPhone: '+254712000001',
+    }),
+    createLearner({
+      id: 'learner_greenwood_02',
+      schoolId: '22222222-2222-2222-2222-222222222222',
+      classId: 'cls_greenwood_g2_blue',
+      admissionNumber: 'GW-102',
+      firstName: 'Mercy',
+      lastName: 'Chepkemoi',
+      fullName: 'Mercy Chepkemoi',
+      className: 'Grade 2 Blue',
+      section: 'A',
+      gender: 'Female',
+      dateOfBirth: '2017-09-22',
+      guardianName: 'David Kip',
+      guardianPhone: '+254723000002',
     }),
   ];
 }
