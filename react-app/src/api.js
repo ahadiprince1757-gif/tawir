@@ -74,11 +74,83 @@ export const api = {
   },
 
   getUsers: async () => {
+    // 1. Try backend server
     try {
-      return await request('/users');
-    } catch {
-      return [];
+      const serverUsers = await request('/users');
+      if (Array.isArray(serverUsers) && serverUsers.length > 0) {
+        return serverUsers;
+      }
+    } catch {}
+
+    // 2. Query Supabase directly if configured
+    if (isSupabaseConfigured()) {
+      try {
+        const [adminsRes, membersRes, classesRes] = await Promise.all([
+          supabase.from('platform_admins').select('user_id, role, active').eq('active', true),
+          supabase.from('school_members').select('user_id, school_id, role, status, schools(id, name, code, status)'),
+          supabase.from('class_memberships').select('id, user_id, school_id, class_id, role, classes(id, name, grade_level, stream)'),
+        ]);
+
+        const userMap = new Map();
+
+        (adminsRes.data || []).forEach((a) => {
+          userMap.set(a.user_id, {
+            userId: a.user_id,
+            name: 'Super Admin (Tawi Team)',
+            email: 'superadmin@tawi.co',
+            platformRole: a.role,
+            shortTitle: 'Super Admin',
+            memberships: [],
+            classAssignments: [],
+          });
+        });
+
+        (membersRes.data || []).forEach((m) => {
+          const defaultName = m.role === 'headteacher' ? 'Mr. Peter Omondi' : 'Teacher';
+          const defaultEmail = `${m.role}@school.ac.ke`;
+          const existing = userMap.get(m.user_id) || {
+            userId: m.user_id,
+            name: defaultName,
+            email: defaultEmail,
+            platformRole: null,
+            shortTitle: m.role === 'headteacher' ? 'Headteacher' : 'Teacher',
+            memberships: [],
+            classAssignments: [],
+          };
+          existing.memberships.push({
+            schoolId: m.school_id,
+            schoolName: m.schools?.name || 'School',
+            schoolCode: m.schools?.code || '',
+            role: m.role,
+            status: m.status,
+          });
+          userMap.set(m.user_id, existing);
+        });
+
+        (classesRes.data || []).forEach((cm) => {
+          const user = userMap.get(cm.user_id);
+          if (user) {
+            user.classAssignments.push({
+              id: cm.id,
+              schoolId: cm.school_id,
+              classId: cm.class_id,
+              className: cm.classes?.name || 'Class',
+              gradeLevel: cm.classes?.grade_level || '',
+              stream: cm.classes?.stream || '',
+              role: cm.role,
+            });
+          }
+        });
+
+        if (userMap.size > 0) {
+          return Array.from(userMap.values());
+        }
+      } catch (err) {
+        console.warn('Could not fetch users from Supabase:', err.message);
+      }
     }
+
+    return [];
   },
 
   login: async (userId, pin) => {

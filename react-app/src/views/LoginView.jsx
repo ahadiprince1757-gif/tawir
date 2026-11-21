@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuth, SYSTEM_USERS } from '../core/auth/authContext.jsx';
+import { useAuth } from '../core/auth/authContext.jsx';
 
 // Simple digit-pad PIN input
 function PinPad({ value, onChange }) {
@@ -69,7 +69,7 @@ function PinPad({ value, onChange }) {
 
 export default function LoginView() {
   const { login, users: authUsers } = useAuth();
-  const userList = (authUsers && authUsers.length > 0) ? authUsers : SYSTEM_USERS;
+  const userList = (authUsers && authUsers.length > 0) ? authUsers : [];
   const [selectedUserId, setSelectedUserId] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');

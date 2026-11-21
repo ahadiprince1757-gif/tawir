@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { SchoolMemory } from './core/memory/schoolMemory.js';
 import { createLearner, createEvent } from './core/database/schema.js';
-import { getMockLearners, getMockEvents } from './core/database/mockData.js';
 import { useAuth } from './core/auth/authContext.jsx';
 import { getPermissions } from './core/auth/permissions.js';
 import { api } from './api.js';
@@ -50,13 +49,21 @@ export default function App() {
 
   // ── Data store ───────────────────────────────────────────────────────────────
   const [learners, setLearners] = useState(() => {
-    const saved = localStorage.getItem('school_memory_learners');
-    return saved && JSON.parse(saved).length > 0 ? JSON.parse(saved) : getMockLearners();
+    try {
+      const saved = localStorage.getItem('school_memory_learners');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
 
   const [events, setEvents] = useState(() => {
-    const saved = localStorage.getItem('school_memory_events');
-    return saved && JSON.parse(saved).length > 0 ? JSON.parse(saved) : getMockEvents();
+    try {
+      const saved = localStorage.getItem('school_memory_events');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
 
   // ── Scoping: Multi-Tenant School & Class Relational Boundary ─────────────────
@@ -121,22 +128,10 @@ export default function App() {
         ]);
         setBackendConnected(true);
         if (Array.isArray(learnersData)) {
-          if (learnersData.length > 0) {
-            setLearners(learnersData.map(createLearner));
-          } else if (!isSupabaseConfigured()) {
-            setLearners(getMockLearners());
-          } else {
-            setLearners([]);
-          }
+          setLearners(learnersData.map(createLearner));
         }
         if (Array.isArray(eventsData)) {
-          if (eventsData.length > 0) {
-            setEvents(eventsData.map(createEvent));
-          } else if (!isSupabaseConfigured()) {
-            setEvents(getMockEvents());
-          } else {
-            setEvents([]);
-          }
+          setEvents(eventsData.map(createEvent));
         }
       } catch (err) {
         console.warn('Backend not reachable, offline mode:', err.message);
@@ -370,15 +365,15 @@ export default function App() {
         return;
       }
     } catch {
-      // Fallback for offline mode
+      // Fallback
     }
-    const mockLearners = getMockLearners();
-    const mockEvents = getMockEvents();
-    setLearners(mockLearners);
-    setEvents(mockEvents);
-    localStorage.setItem('school_memory_learners', JSON.stringify(mockLearners));
-    localStorage.setItem('school_memory_events', JSON.stringify(mockEvents));
-    showToast('Demo data loaded for active school!');
+    const [fetchedLearners, fetchedEvents] = await Promise.all([
+      api.getLearners().catch(() => []),
+      api.getEvents().catch(() => []),
+    ]);
+    setLearners(fetchedLearners.map(createLearner));
+    setEvents(fetchedEvents.map(createEvent));
+    showToast('Data refreshed from database!');
   };
 
   // ── Gate: show login screen if not authenticated ──────────────────────────────

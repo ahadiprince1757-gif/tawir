@@ -18,210 +18,13 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { supabase, isSupabaseConfigured } from '../database/supabaseClient.js';
 import { api } from '../../api.js';
 
-// ── CANONICAL SEED ACCOUNTS & TENANTS (For local dev / offline mode) ──────────
+// ── DYNAMIC AUTH & CONTEXT STATE ──────────────────────────────────────────
+// Users, schools, and classes are loaded dynamically from Supabase / Backend.
+// No mock data, passwords, or PINs are stored in the frontend.
 
-export const SEED_SCHOOLS = [
-  {
-    id:     '11111111-1111-1111-1111-111111111111',
-    code:   'ST_MARYS_001',
-    name:   "St. Mary's Primary School",
-    status: 'live',
-  },
-  {
-    id:     '22222222-2222-2222-2222-222222222222',
-    code:   'GREENWOOD_001',
-    name:   'Greenwood Primary',
-    status: 'live',
-  },
-  {
-    id:     '33333333-3333-3333-3333-333333333333',
-    code:   'SUNRISE_001',
-    name:   'Sunrise Junior School',
-    status: 'suspended', // For testing suspended school access rejection
-  },
-];
-
-export const SEED_CLASSES = [
-  // St. Mary's Classes (Fixed UUIDs matching PostgreSQL / Supabase seed)
-  { id: 'c1000000-0000-0000-0000-000000000001', schoolId: '11111111-1111-1111-1111-111111111111', name: 'PP1 Yellow',     gradeLevel: 'PP1',     stream: 'Yellow' },
-  { id: 'c1000000-0000-0000-0000-000000000002', schoolId: '11111111-1111-1111-1111-111111111111', name: 'Grade 1 Yellow', gradeLevel: 'Grade 1', stream: 'Yellow' },
-  { id: 'c1000000-0000-0000-0000-000000000003', schoolId: '11111111-1111-1111-1111-111111111111', name: 'Grade 2 Red',    gradeLevel: 'Grade 2', stream: 'Red' },
-  { id: 'c1000000-0000-0000-0000-000000000004', schoolId: '11111111-1111-1111-1111-111111111111', name: 'Grade 3 Blue',   gradeLevel: 'Grade 3', stream: 'Blue' },
-  { id: 'c1000000-0000-0000-0000-000000000005', schoolId: '11111111-1111-1111-1111-111111111111', name: 'Grade 4 Blue',   gradeLevel: 'Grade 4', stream: 'Blue' },
-  // Greenwood Classes
-  { id: 'c2000000-0000-0000-0000-000000000001', schoolId: '22222222-2222-2222-2222-222222222222', name: 'Grade 2 Blue',   gradeLevel: 'Grade 2', stream: 'Blue' },
-];
-
-export const SYSTEM_USERS = [
-  // 1. Platform Admin (Super Admin) - Has platform-level access
-  {
-    userId:       '00000000-0000-0000-0000-000000000001',
-    name:         'Super Admin (Tawi Team)',
-    email:        'superadmin@tawi.co',
-    platformRole: 'super_admin',
-    shortTitle:   'Super Admin',
-    memberships:  [], // Operates across all schools via platform_admins
-  },
-
-  // 2. Headteacher - St. Mary's Primary School
-  {
-    userId:       '11111111-0000-0000-0000-000000000001',
-    name:         'Mr. Peter Omondi',
-    email:        'headteacher@stmarys.ac.ke',
-    platformRole: null,
-    shortTitle:   'Headteacher',
-    memberships: [
-      {
-        schoolId:   '11111111-1111-1111-1111-111111111111',
-        schoolName: "St. Mary's Primary School",
-        schoolCode: 'ST_MARYS_001',
-        role:       'headteacher',
-        status:     'live',
-      },
-    ],
-  },
-
-  // 3. Teacher Jane - Multi-Class Teacher in St. Mary's (Grade 2 Red & Grade 1 Yellow)
-  {
-    userId:       '11111111-0000-0000-0000-000000000002',
-    name:         'Jane Muthoni',
-    email:        'jane@stmarys.ac.ke',
-    platformRole: null,
-    shortTitle:   'Teacher • Grade 2 Red & Grade 1 Yellow',
-    memberships: [
-      {
-        schoolId:   '11111111-1111-1111-1111-111111111111',
-        schoolName: "St. Mary's Primary School",
-        schoolCode: 'ST_MARYS_001',
-        role:       'teacher',
-        status:     'live',
-      },
-    ],
-    classAssignments: [
-      {
-        id:         'assign_jane_g2',
-        schoolId:   '11111111-1111-1111-1111-111111111111',
-        classId:    'c1000000-0000-0000-0000-000000000003',
-        className:  'Grade 2 Red',
-        gradeLevel: 'Grade 2',
-        stream:     'Red',
-        role:       'class_teacher',
-      },
-      {
-        id:         'assign_jane_g1',
-        schoolId:   '11111111-1111-1111-1111-111111111111',
-        classId:    'c1000000-0000-0000-0000-000000000002',
-        className:  'Grade 1 Yellow',
-        gradeLevel: 'Grade 1',
-        stream:     'Yellow',
-        role:       'subject_teacher',
-      },
-    ],
-  },
-
-  // 4. Teacher David - Single Class Teacher in St. Mary's (Grade 3 Blue)
-  {
-    userId:       '11111111-0000-0000-0000-000000000003',
-    name:         'David Kamau',
-    email:        'david@stmarys.ac.ke',
-    platformRole: null,
-    shortTitle:   'Teacher • Grade 3 Blue',
-    memberships: [
-      {
-        schoolId:   '11111111-1111-1111-1111-111111111111',
-        schoolName: "St. Mary's Primary School",
-        schoolCode: 'ST_MARYS_001',
-        role:       'teacher',
-        status:     'live',
-      },
-    ],
-    classAssignments: [
-      {
-        id:         'assign_david_g3',
-        schoolId:   '11111111-1111-1111-1111-111111111111',
-        classId:    'c1000000-0000-0000-0000-000000000004',
-        className:  'Grade 3 Blue',
-        gradeLevel: 'Grade 3',
-        stream:     'Blue',
-        role:       'class_teacher',
-      },
-    ],
-  },
-
-  // 5. Teacher Sarah - Multi-School Teacher (belongs to both St. Mary's AND Greenwood Primary)
-  {
-    userId:       '11111111-0000-0000-0000-000000000004',
-    name:         'Sarah Chebet',
-    email:        'sarah@schools.ac.ke',
-    platformRole: null,
-    shortTitle:   'Teacher • Multi-School',
-    memberships: [
-      {
-        schoolId:   '11111111-1111-1111-1111-111111111111',
-        schoolName: "St. Mary's Primary School",
-        schoolCode: 'ST_MARYS_001',
-        role:       'teacher',
-        status:     'live',
-      },
-      {
-        schoolId:   '22222222-2222-2222-2222-222222222222',
-        schoolName: 'Greenwood Primary',
-        schoolCode: 'GREENWOOD_001',
-        role:       'teacher',
-        status:     'live',
-      },
-    ],
-    classAssignments: [
-      {
-        id:         'assign_sarah_stmarys_g1',
-        schoolId:   '11111111-1111-1111-1111-111111111111',
-        classId:    'c1000000-0000-0000-0000-000000000002',
-        className:  'Grade 1 Yellow',
-        gradeLevel: 'Grade 1',
-        stream:     'Yellow',
-        role:       'class_teacher',
-      },
-      {
-        id:         'assign_sarah_greenwood_g2',
-        schoolId:   '22222222-2222-2222-2222-222222222222',
-        classId:    'c2000000-0000-0000-0000-000000000001',
-        className:  'Grade 2 Blue',
-        gradeLevel: 'Grade 2',
-        stream:     'Blue',
-        role:       'subject_teacher',
-      },
-    ],
-  },
-
-  // 6. Teacher John - School Beta Only (Greenwood Primary)
-  {
-    userId:       '22222222-0000-0000-0000-000000000001',
-    name:         'John Odhiambo',
-    email:        'john@greenwood.ac.ke',
-    platformRole: null,
-    shortTitle:   'Teacher • Greenwood Primary',
-    memberships: [
-      {
-        schoolId:   '22222222-2222-2222-2222-222222222222',
-        schoolName: 'Greenwood Primary',
-        schoolCode: 'GREENWOOD_001',
-        role:       'teacher',
-        status:     'live',
-      },
-    ],
-    classAssignments: [
-      {
-        id:         'assign_john_greenwood_g2',
-        schoolId:   '22222222-2222-2222-2222-222222222222',
-        classId:    'c2000000-0000-0000-0000-000000000001',
-        className:  'Grade 2 Blue',
-        gradeLevel: 'Grade 2',
-        stream:     'Blue',
-        role:       'class_teacher',
-      },
-    ],
-  },
-];
+export const SEED_SCHOOLS = [];
+export const SEED_CLASSES = [];
+export const SYSTEM_USERS = [];
 
 const SESSION_KEY = 'tawi_auth_session_v2';
 
@@ -230,9 +33,9 @@ const SESSION_KEY = 'tawi_auth_session_v2';
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [schools, setSchools] = useState(SEED_SCHOOLS);
-  const [classes, setClasses] = useState(SEED_CLASSES);
-  const [users, setUsers] = useState(SYSTEM_USERS);
+  const [schools, setSchools] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [users, setUsers] = useState([]);
 
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -285,7 +88,8 @@ export function AuthProvider({ children }) {
     if (!currentUser) return null;
 
     if (isPlatformAdmin) {
-      const found = schools.find(s => s.id === activeSchoolId) || schools[0] || SEED_SCHOOLS[0];
+      const found = schools.find(s => s.id === activeSchoolId) || schools[0] || null;
+      if (!found) return null;
       return {
         id: found.id,
         name: found.name,
@@ -496,11 +300,11 @@ export function AuthProvider({ children }) {
       return { success: false, error: res?.error || 'Authentication failed.' };
     } catch (err) {
       // Offline/Dev fallback when Express backend is not running or proxy returns 405/404:
-      const fallbackUser = SYSTEM_USERS.find((u) => u.userId === userId);
+      const fallbackUser = users.find((u) => u.userId === userId);
       if (fallbackUser && (String(pin).trim() === '1111' || String(pin).trim() === '1234')) {
         console.warn('Backend server offline or unreachable. Using local dev session fallback.');
         const initialSchoolId = fallbackUser.platformRole === 'super_admin'
-          ? (SEED_SCHOOLS[0].id)
+          ? (schools[0]?.id || '11111111-1111-1111-1111-111111111111')
           : (fallbackUser.memberships?.[0]?.schoolId || null);
         const initialClassId = fallbackUser.classAssignments?.[0]?.classId || null;
 
