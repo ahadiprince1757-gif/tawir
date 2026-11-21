@@ -85,29 +85,12 @@ export default function AddRecordModal({
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 9000,
-        background: 'rgba(0,0,0,0.45)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '20px 16px',
-      }}
-      onClick={onClose}
-    >
+    <div className="modal-backdrop" onClick={onClose}>
       <div
+        className="modal modal-sheet modal-form-sheet"
         onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'var(--bg)',
-          border: '1.5px solid var(--border)',
-          borderRadius: 16,
-          padding: '28px 24px',
-          width: '100%',
-          maxWidth: 440,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 16,
-        }}
       >
+        <div className="mobile-sheet-handle modal-handle-bar" />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>

@@ -59,34 +59,12 @@ export default function AddLearnerModal({
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9000,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px 16px',
-      }}
-      onClick={onClose}
-    >
+    <div className="modal-backdrop" onClick={onClose}>
       <div
+        className="modal modal-sheet modal-form-sheet"
         onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'var(--bg)',
-          border: '1.5px solid var(--border)',
-          borderRadius: 16,
-          padding: '24px 24px',
-          width: '100%',
-          maxWidth: 440,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 16,
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
-        }}
       >
+        <div className="mobile-sheet-handle modal-handle-bar" />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>

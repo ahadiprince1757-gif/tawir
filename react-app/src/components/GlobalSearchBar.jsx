@@ -38,7 +38,7 @@ export default function GlobalSearchBar({ learners, schoolMemory, onSelectLearne
         <input
           type="text"
           className="global-search-input"
-          placeholder="Search by admission no (e.g. 3021), name part (e.g. Mwan), or class..."
+          placeholder="Search learner, admission no, or class..."
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);

@@ -387,6 +387,14 @@ export default function App() {
         backendConnected={backendConnected}
         currentUser={currentUser}
         activeSchool={activeSchool}
+        availableSchools={availableSchools}
+        onSelectSchool={setActiveSchoolId}
+        classAssignments={classAssignments}
+        activeClass={activeClass}
+        onSelectClass={setActiveClassId}
+        isPlatformAdmin={isPlatformAdmin}
+        isHeadteacher={isHeadteacher}
+        isTeacher={isTeacher}
         onLogout={logout}
         onOpenEraseModal={perms.canEraseAllData ? () => setIsEraseModalOpen(true) : null}
       />

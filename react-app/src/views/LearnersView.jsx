@@ -162,11 +162,10 @@ export default function LearnersView({
           </select>
 
           <input
-            className="search"
-            placeholder="Search admission no (e.g. 3021), name part (e.g. mwan), or class..."
+            className="search learners-search-input"
+            placeholder="Search learner, admission no, or class..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            autoFocus
           />
           <span className="results-badge">
             {filtered.length} of {learners.length}
@@ -174,17 +173,7 @@ export default function LearnersView({
           <button
             type="button"
             onClick={() => setIsAddLearnerOpen(true)}
-            style={{
-              padding: '8px 14px',
-              borderRadius: 8,
-              border: 'none',
-              background: 'var(--ink)',
-              color: '#fff',
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
+            className="btn-add-learner-prominent"
           >
             + Add Learner
           </button>
@@ -192,7 +181,7 @@ export default function LearnersView({
       </div>
 
       {/* Class Filter Chips & Column Selection */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
+      <div className="learners-filter-bar">
         <div className="class-filter-chips" style={{ margin: 0 }}>
           <button
             className={`filter-chip ${selectedClass === 'ALL' ? 'active' : ''}`}

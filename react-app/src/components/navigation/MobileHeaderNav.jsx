@@ -6,70 +6,73 @@ export default function MobileHeaderNav({
   onNavigate,
   backendConnected,
   currentUser,
+  activeSchool,
+  availableSchools = [],
+  onSelectSchool,
+  classAssignments = [],
+  activeClass,
+  onSelectClass,
+  isPlatformAdmin,
+  isHeadteacher,
+  isTeacher,
   onLogout,
   onOpenEraseModal,
 }) {
-  const [menuOpen, setMenuOpen]     = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [pinModalOpen, setPinModalOpen] = useState(false);
+
+  const roleLabel = isPlatformAdmin
+    ? 'Platform Admin'
+    : isHeadteacher
+    ? 'Headteacher'
+    : isTeacher
+    ? 'Teacher'
+    : 'User';
+
+  const contextTitle = isTeacher
+    ? (activeClass?.name || activeClass?.className || currentUser?.className || 'My Class')
+    : (activeSchool?.name || 'School');
 
   return (
     <>
       <header className="mobile-header">
+        {/* Brand */}
         <div className="mobile-brand" onClick={() => onNavigate('today')}>
           <img src="/logo.png" alt="Tawi Logo" className="mobile-brand-logo" />
           <span className="mobile-brand-title">Tawi</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {/* User chip — tap to open action sheet */}
+        {/* Center / Right Scope & Actions */}
+        <div className="mobile-header-right">
+          {/* Active Context Chip (Tap opens switcher drawer) */}
           {currentUser && (
             <button
+              className="mobile-scope-chip"
               onClick={() => setMenuOpen(true)}
-              title={`${currentUser.name} — tap for options`}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-                padding: '4px 10px',
-                borderRadius: 20,
-                border: '1.5px solid var(--border)',
-                background: 'var(--surface)',
-                color: 'var(--ink)',
-                fontSize: 11,
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                maxWidth: 140,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
+              title="Tap to switch class, school or view account"
             >
-              <span style={{ fontSize: 14 }}>
-                {currentUser.role === 'headteacher' ? '🏫' : '👤'}
+              <span className="mobile-scope-icon">
+                {isPlatformAdmin ? '⚙️' : isHeadteacher ? '🏫' : '📚'}
               </span>
-              <span>
-                {currentUser.role === 'headteacher'
-                  ? 'Headteacher'
-                  : currentUser.className}
-              </span>
+              <span className="mobile-scope-text">{contextTitle}</span>
+              <span className="mobile-scope-arrow">▾</span>
             </button>
           )}
 
-          {/* Erase button — headteacher only */}
+          {/* Quick Erase Button (Headteacher / Admin only) */}
           {onOpenEraseModal && (
             <button
               className="mobile-header-erase-btn"
               onClick={onOpenEraseModal}
-              title="Erase inserted data / Reset system"
+              title="Reset system or erase inserted data"
               aria-label="Erase system data"
             >
               <TrashIcon size={14} />
             </button>
           )}
 
-          {/* Backend status dot */}
-          <div className="mobile-status-indicator">
+          {/* Backend Status Indicator */}
+          <div className="mobile-status-indicator" title={backendConnected ? 'Live Database Connected' : 'Working Offline'}>
             <span
               className="mobile-status-dot"
               style={{ backgroundColor: backendConnected ? '#315d43' : '#795d28' }}
@@ -81,64 +84,157 @@ export default function MobileHeaderNav({
         </div>
       </header>
 
-      {/* Mobile action sheet for user menu */}
+      {/* ── Mobile Action & Scope Switcher Bottom Sheet ── */}
       {menuOpen && (
         <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 8000,
-            background: 'rgba(0,0,0,0.4)',
-            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          }}
+          className="mobile-sheet-backdrop"
           onClick={() => setMenuOpen(false)}
         >
           <div
+            className="mobile-sheet-card"
             onClick={(e) => e.stopPropagation()}
-            style={{
-              background: 'var(--bg)',
-              borderTop: '1.5px solid var(--border)',
-              borderRadius: '18px 18px 0 0',
-              padding: '20px 20px 32px',
-              width: '100%',
-              maxWidth: 480,
-            }}
           >
-            {/* Handle */}
-            <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border)', margin: '0 auto 20px' }} />
+            {/* Sheet Drag Handle */}
+            <div className="mobile-sheet-handle" />
 
-            {/* User info */}
-            <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
-              <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--ink)' }}>{currentUser?.name}</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                {currentUser?.role === 'headteacher'
-                  ? 'Headteacher · Full School'
-                  : `Teacher · ${currentUser?.className}`}
+            {/* User Profile Header */}
+            <div className="mobile-sheet-profile">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="mobile-profile-avatar">
+                  {isPlatformAdmin ? '⚙️' : isHeadteacher ? '🏫' : '👤'}
+                </div>
+                <div>
+                  <div className="mobile-profile-name">{currentUser?.name}</div>
+                  <div className="mobile-profile-role">
+                    {roleLabel} • {activeSchool?.name || 'Tawi System'}
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Actions */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* School Switcher (For Platform Admin or Multi-School Staff) */}
+            {(isPlatformAdmin || availableSchools.length > 1) && (
+              <div className="mobile-switcher-group">
+                <label className="mobile-switcher-label">
+                  {isPlatformAdmin ? 'Active School Context' : 'Switch School'}
+                </label>
+                <select
+                  value={activeSchool?.id || ''}
+                  onChange={(e) => {
+                    if (onSelectSchool) onSelectSchool(e.target.value);
+                  }}
+                  className="mobile-switcher-select"
+                >
+                  {availableSchools.map((s) => (
+                    <option key={s.id} value={s.id} disabled={s.status === 'suspended'}>
+                      {s.name} {s.status === 'suspended' ? '(Suspended)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Class Switcher (For Multi-Class Teachers) */}
+            {isTeacher && classAssignments.length > 1 && (
+              <div className="mobile-switcher-group">
+                <label className="mobile-switcher-label">Active Assigned Class</label>
+                <select
+                  value={activeClass?.classId || ''}
+                  onChange={(e) => {
+                    if (onSelectClass) onSelectClass(e.target.value);
+                  }}
+                  className="mobile-switcher-select"
+                >
+                  {classAssignments.map((ca) => (
+                    <option key={ca.classId} value={ca.classId}>
+                      {ca.className} ({ca.role === 'class_teacher' ? 'Class Teacher' : 'Subject Teacher'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Navigation / Quick Shortcuts */}
+            <div className="mobile-shortcuts-list">
               <button
-                onClick={() => { setMenuOpen(false); setPinModalOpen(true); }}
-                style={{
-                  width: '100%', padding: '14px 16px', borderRadius: 12,
-                  border: '1.5px solid var(--border)', background: 'var(--surface)',
-                  color: 'var(--ink)', fontSize: 14, fontWeight: 600,
-                  cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                className="mobile-sheet-action-btn"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onNavigate('today');
+                }}
+              >
+                <span>📅 {isTeacher ? 'My Class Workbench' : 'School Overview'}</span>
+                <span className="mobile-action-chevron">›</span>
+              </button>
+
+              <button
+                className="mobile-sheet-action-btn"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onNavigate('learners');
+                }}
+              >
+                <span>👥 Learners Directory</span>
+                <span className="mobile-action-chevron">›</span>
+              </button>
+
+              <button
+                className="mobile-sheet-action-btn"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onNavigate('smartsheet');
+                }}
+              >
+                <span>📋 Smart Sheet (Bulk Ingestion)</span>
+                <span className="mobile-action-chevron">›</span>
+              </button>
+
+              {(isPlatformAdmin || isHeadteacher) && (
+                <button
+                  className="mobile-sheet-action-btn"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onNavigate('timeline');
+                  }}
+                >
+                  <span>📜 Event Timeline & Audit</span>
+                  <span className="mobile-action-chevron">›</span>
+                </button>
+              )}
+            </div>
+
+            {/* Account & Security Actions */}
+            <div className="mobile-sheet-footer-actions">
+              <button
+                className="mobile-sheet-footer-btn"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setPinModalOpen(true);
                 }}
               >
                 Change PIN
               </button>
 
+              {onOpenEraseModal && (
+                <button
+                  className="mobile-sheet-footer-btn danger"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onOpenEraseModal();
+                  }}
+                >
+                  Reset / Erase Data
+                </button>
+              )}
+
               <button
-                onClick={() => { setMenuOpen(false); onLogout(); }}
-                style={{
-                  width: '100%', padding: '14px 16px', borderRadius: 12,
-                  border: '1.5px solid var(--border)', background: 'var(--surface)',
-                  color: '#c0392b', fontSize: 14, fontWeight: 600,
-                  cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                className="mobile-sheet-footer-btn signout"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onLogout();
                 }}
               >
-                Sign out
+                Sign Out
               </button>
             </div>
           </div>

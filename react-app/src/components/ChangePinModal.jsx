@@ -168,31 +168,15 @@ export default function ChangePinModal({ isOpen, onClose }) {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 9000,
-        background: 'rgba(0,0,0,0.45)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '24px 16px',
-      }}
-      onClick={handleClose}
-    >
+    <div className="modal-backdrop" onClick={handleClose}>
       <div
+        className="modal modal-sheet"
         onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'var(--bg)',
-          border: '1.5px solid var(--border)',
-          borderRadius: 18,
-          padding: '32px 28px',
-          width: '100%',
-          maxWidth: 340,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 20,
-        }}
+        style={{ maxWidth: 360, padding: '24px 20px' }}
       >
+        <div className="mobile-sheet-handle modal-handle-bar" />
         {/* Header */}
-        <div style={{ textAlign: 'center' }}>
+        <div style={{ textAlign: 'center', marginBottom: 12 }}>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', marginBottom: 4 }}>
             Change PIN
           </div>

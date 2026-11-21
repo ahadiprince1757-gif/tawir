@@ -94,99 +94,43 @@ export default function TodayView({
         </div>
 
         {/* ── 4 Quick Primary Action Buttons ─────────────────────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 24 }}>
+        <div className="teacher-quick-actions">
           <button
             onClick={() => setAttendanceRollOpen(!attendanceRollOpen)}
-            style={{
-              padding: '12px 14px',
-              borderRadius: 12,
-              border: attendanceRollOpen ? '2px solid var(--ink)' : '1.5px solid var(--border)',
-              background: attendanceRollOpen ? 'var(--ink)' : 'var(--surface)',
-              color: attendanceRollOpen ? '#fff' : 'var(--ink)',
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4,
-              textAlign: 'left',
-            }}
+            className={`teacher-action-card ${attendanceRollOpen ? 'active' : ''}`}
           >
-            <span>Attendance Roll</span>
-            <small style={{ fontWeight: 400, opacity: 0.85, fontSize: 11 }}>
+            <span className="teacher-action-title">📋 Attendance Roll</span>
+            <small className="teacher-action-sub">
               {dailyBriefing.absent > 0 ? `${dailyBriefing.absent} absent • Tap exceptions` : 'All present • Tap exceptions'}
             </small>
           </button>
 
           <button
             onClick={() => setIsAddLearnerOpen(true)}
-            style={{
-              padding: '12px 14px',
-              borderRadius: 12,
-              border: '1.5px solid var(--border)',
-              background: 'var(--surface)',
-              color: 'var(--ink)',
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4,
-              textAlign: 'left',
-            }}
+            className="teacher-action-card"
           >
-            <span>+ Add Learner</span>
-            <small style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11 }}>
+            <span className="teacher-action-title">➕ Add Learner</span>
+            <small className="teacher-action-sub">
               3-click class enrollment
             </small>
           </button>
 
           <button
             onClick={() => handleOpenAddRecord('assessment')}
-            style={{
-              padding: '12px 14px',
-              borderRadius: 12,
-              border: '1.5px solid var(--border)',
-              background: 'var(--surface)',
-              color: 'var(--ink)',
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4,
-              textAlign: 'left',
-            }}
+            className="teacher-action-card"
           >
-            <span>Record Marks</span>
-            <small style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11 }}>
+            <span className="teacher-action-title">📝 Record Marks</span>
+            <small className="teacher-action-sub">
               Quick test & exam scores
             </small>
           </button>
 
           <button
             onClick={() => handleOpenAddRecord('observation')}
-            style={{
-              padding: '12px 14px',
-              borderRadius: 12,
-              border: '1.5px solid var(--border)',
-              background: 'var(--surface)',
-              color: 'var(--ink)',
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4,
-              textAlign: 'left',
-            }}
+            className="teacher-action-card"
           >
-            <span>Add Observation</span>
-            <small style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 11 }}>
+            <span className="teacher-action-title">🔍 Add Observation</span>
+            <small className="teacher-action-sub">
               Note progress or mistake
             </small>
           </button>
@@ -194,8 +138,8 @@ export default function TodayView({
 
         {/* ── Optional Quick Attendance Checklist Drawer ──────────────────────── */}
         {attendanceRollOpen && (
-          <div className="panel" style={{ marginBottom: 24, padding: '16px 20px', border: '2px solid var(--ink)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div className="panel attendance-roll-panel" style={{ marginBottom: 24, padding: '16px 20px', border: '2px solid var(--ink)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
               <div>
                 <strong style={{ fontSize: 15 }}>Today's Roll Call ({todayDateLabel()})</strong>
                 <div style={{ fontSize: 12, color: 'var(--muted)' }}>
@@ -204,14 +148,14 @@ export default function TodayView({
               </div>
               <button
                 className="secondary"
-                style={{ padding: '4px 10px', fontSize: 11 }}
+                style={{ padding: '6px 12px', fontSize: 12, borderRadius: 8 }}
                 onClick={() => setAttendanceRollOpen(false)}
               >
-                Close Roll Call
+                Done
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+            <div className="roll-call-grid">
               {learners.map((learner) => {
                 const isAbsent = dailyBriefing.absentLearnerIds.includes(learner.id);
                 return (
@@ -267,29 +211,18 @@ export default function TodayView({
                 Click any learner to view their complete dossier & evidence history
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div className="roster-header-actions">
               <input
                 type="text"
                 placeholder="Search learner..."
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
-                className="search"
-                style={{ width: 170, padding: '6px 12px', fontSize: 13 }}
+                className="search roster-search-input"
               />
               <button
                 type="button"
                 onClick={() => setIsAddLearnerOpen(true)}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: 8,
-                  border: 'none',
-                  background: 'var(--ink)',
-                  color: '#fff',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
+                className="btn-add-learner-compact"
               >
                 + Add Learner
               </button>
