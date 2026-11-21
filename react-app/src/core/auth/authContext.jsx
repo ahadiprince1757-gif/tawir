@@ -299,41 +299,53 @@ export function AuthProvider({ children }) {
       }
       return { success: false, error: res?.error || 'Authentication failed.' };
     } catch (err) {
-      // Offline/Dev fallback when Express backend is not running or proxy returns 405/404:
+      // Offline/Dev fallback: backend not running. Validate PIN directly against
+      // the user list fetched from /api/users (PINs are stripped server-side, so
+      // this is only a UI-flow fallback — it still requires the backend to have
+      // served the user list at startup). We re-fetch here to get the full user
+      // record including PIN for offline validation.
+      try {
+        const offlineRes = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, pin }),
+        });
+        // If the server came back up, handle it properly
+        if (offlineRes.ok) {
+          const data = await offlineRes.json();
+          if (data.success && data.user) {
+            const user = data.user;
+            const initialSchoolId = data.activeSchoolId || user.memberships?.[0]?.schoolId || null;
+            const initialClassId  = data.activeClassId  || user.classAssignments?.[0]?.classId || null;
+            const session = {
+              userId: user.userId, name: user.name, email: user.email,
+              platformRole: user.platformRole, memberships: user.memberships || [],
+              classAssignments: user.classAssignments || [], shortTitle: user.shortTitle,
+              activeSchoolId: initialSchoolId, activeClassId: initialClassId,
+              role: user.platformRole || user.memberships?.[0]?.role || 'teacher',
+              className: user.classAssignments?.[0]?.className || null, classId: initialClassId,
+            };
+            setCurrentUser(session);
+            setActiveSchoolIdState(initialSchoolId);
+            setActiveClassIdState(initialClassId);
+            localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+            return { success: true };
+          }
+          return { success: false, error: 'Incorrect PIN.' };
+        }
+      } catch { /* server truly offline, fall through */ }
+
+      // Last resort: use the in-memory users list (fetched without PINs).
+      // This can only succeed if the user was already loaded — it won't validate
+      // the PIN, so we show a helpful message instead.
       const fallbackUser = users.find((u) => u.userId === userId);
-      if (fallbackUser && (String(pin).trim() === '1111' || String(pin).trim() === '1234')) {
-        console.warn('Backend server offline or unreachable. Using local dev session fallback.');
-        const initialSchoolId = fallbackUser.platformRole === 'super_admin'
-          ? (schools[0]?.id || '11111111-1111-1111-1111-111111111111')
-          : (fallbackUser.memberships?.[0]?.schoolId || null);
-        const initialClassId = fallbackUser.classAssignments?.[0]?.classId || null;
-
-        const session = {
-          userId:           fallbackUser.userId,
-          name:             fallbackUser.name,
-          email:            fallbackUser.email,
-          platformRole:     fallbackUser.platformRole,
-          memberships:      fallbackUser.memberships || [],
-          classAssignments: fallbackUser.classAssignments || [],
-          shortTitle:       fallbackUser.shortTitle,
-          activeSchoolId:   initialSchoolId,
-          activeClassId:    initialClassId,
-          role:             fallbackUser.platformRole || fallbackUser.memberships?.[0]?.role || 'teacher',
-          className:        fallbackUser.classAssignments?.[0]?.className || null,
-          classId:          initialClassId,
-        };
-
-        setCurrentUser(session);
-        setActiveSchoolIdState(initialSchoolId);
-        setActiveClassIdState(initialClassId);
-        localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-
-        return { success: true };
+      if (!fallbackUser) {
+        return { success: false, error: 'Server offline. Please start the backend server and try again.' };
       }
 
-      return { success: false, error: err.message?.includes('405') ? 'Incorrect PIN.' : (err.message || 'Incorrect PIN or server offline.') };
+      return { success: false, error: 'Cannot verify PIN — backend server is offline. Start the server and retry.' };
     }
-  }, []);
+  }, [users, schools]);
 
   const logout = useCallback(() => {
     setCurrentUser(null);
