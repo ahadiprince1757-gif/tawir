@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import WhatHappenedComposer from '../components/WhatHappenedComposer.jsx';
 import AddRecordModal from '../components/AddRecordModal.jsx';
 import AddLearnerModal from '../components/AddLearnerModal.jsx';
 import LandscapeResultSheetModal from '../components/LandscapeResultSheetModal.jsx';
+import { runSchoolIntelligenceEngine } from '../features/school-intelligence/index.js';
 import { todayDateKey, todayDateLabel, timeLabel } from '../utils/formatters.js';
 
 export default function TodayView({
@@ -24,16 +24,16 @@ export default function TodayView({
   const isTeacher = currentUser?.role === 'teacher';
   const todayKey = todayDateKey();
 
-  // Teacher Quick Modal State
+  // Modal State
   const [isAddRecordOpen, setIsAddRecordOpen] = useState(false);
   const [isAddLearnerOpen, setIsAddLearnerOpen] = useState(false);
   const [isLandscapeSheetOpen, setIsLandscapeSheetOpen] = useState(false);
   const [recordInitialType, setRecordInitialType] = useState('observation');
 
-  // Attendance & Filtering State
+  // Filtering & Search State
   const [searchFilter, setSearchFilter] = useState('');
-  const [attendanceRollOpen, setAttendanceRollOpen] = useState(false);
-  const [activeFilter, setActiveFilter] = useState('absent'); // 'absent' | 'all' | 'present' | null
+  const [activityCategory, setActivityCategory] = useState('all'); // 'all' | 'attendance' | 'assessment' | 'incident'
+  const [activeFilter, setActiveFilter] = useState(null); // 'absent' | 'outstanding' | null
   const [selectedClass, setSelectedClass] = useState('ALL');
 
   const dailyBriefing = useMemo(
@@ -47,7 +47,7 @@ export default function TodayView({
     return map;
   }, [learners]);
 
-  // Unique classes for Headteacher view
+  // Unique classes list
   const classesList = useMemo(() => {
     const set = new Set();
     learners.forEach((l) => {
@@ -56,7 +56,19 @@ export default function TodayView({
     return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   }, [learners]);
 
-  // Filtered learners in My Class
+  // Tawi School Intelligence Engine computation
+  const intelligence = useMemo(() => {
+    return runSchoolIntelligenceEngine({
+      schoolId: activeSchool?.id || '11111111-1111-1111-1111-111111111111',
+      schoolName: activeSchool?.name || "St. Mary's Primary School",
+      learners,
+      events,
+      classes: classesList.map(name => ({ id: name, name })),
+      todayDateKey: todayKey,
+    });
+  }, [activeSchool, learners, events, classesList, todayKey]);
+
+  // Filtered class learners for Teacher View
   const filteredClassLearners = useMemo(() => {
     if (!searchFilter.trim()) return learners;
     const q = searchFilter.toLowerCase().trim();
@@ -67,10 +79,12 @@ export default function TodayView({
     );
   }, [learners, searchFilter]);
 
-  // Recent events for this class or school
-  const recentEvents = useMemo(() => {
-    return (events || []).slice(0, 8);
-  }, [events]);
+  // Filtered Activity Stream for Headteacher View
+  const filteredActivities = useMemo(() => {
+    const stream = intelligence.activityStream || [];
+    if (activityCategory === 'all') return stream;
+    return stream.filter(item => item.category === activityCategory);
+  }, [intelligence.activityStream, activityCategory]);
 
   const handleOpenAddRecord = (type = 'observation') => {
     setRecordInitialType(type);
@@ -78,267 +92,102 @@ export default function TodayView({
   };
 
   // ═════════════════════════════════════════════════════════════════════════════
-  // 1. TEACHER SURFACE: "MY CLASS" (Clean, operational, no analytics clutter)
+  // 1. TEACHER SURFACE: "MY CLASS" (Fast execution, 1-tap attendance roster)
   // ═════════════════════════════════════════════════════════════════════════════
   if (isTeacher) {
+    const absentCount = dailyBriefing.absent || 0;
+    const presentCount = Math.max(0, learners.length - absentCount);
+
     return (
-      <section className="view active">
-        {/* Minimal Class Header */}
-        <div className="page-head" style={{ marginBottom: 16 }}>
+      <section className="view active teacher-view-container">
+        {/* Class Header */}
+        <div className="teacher-header-bar">
           <div>
-            <h1 style={{ fontSize: 24, fontWeight: 800 }}>{currentUser.className || 'My Class'}</h1>
-            <div className="sub" style={{ fontSize: 13, color: 'var(--muted)' }}>
-              {learners.length} Learners • {currentUser.name}
+            <h1 className="teacher-class-title">{currentUser.className || 'My Class'}</h1>
+            <div className="teacher-class-meta">
+              {learners.length} Registered • <strong style={{ color: absentCount > 0 ? '#b91c1c' : '#15803d' }}>
+                {absentCount > 0 ? `${absentCount} Absent Today` : 'All Present'}
+              </strong>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="teacher-header-actions">
             <button
               onClick={() => setIsLandscapeSheetOpen(true)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '7px 12px',
-                borderRadius: 8,
-                border: '1.5px solid var(--border)',
-                background: 'var(--surface)',
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: 'pointer',
-                color: 'var(--ink)',
-              }}
+              className="btn-sheet-trigger"
               title="View & Print Official Landscape Result Sheet"
             >
-              📄 Class Result Sheet
+              📄 Result Sheet
             </button>
-            <div className="date">{todayDateLabel()}</div>
+            <span className="teacher-date-badge">{todayDateLabel()}</span>
           </div>
         </div>
 
-        {/* ── 4 Quick Primary Action Buttons ─────────────────────────────────── */}
-        <div className="teacher-quick-actions">
-          <button
-            onClick={() => setAttendanceRollOpen(!attendanceRollOpen)}
-            className={`teacher-action-card ${attendanceRollOpen ? 'active' : ''}`}
-          >
-            <span className="teacher-action-title">📋 Attendance Roll</span>
-            <small className="teacher-action-sub">
-              {dailyBriefing.absent > 0 ? `${dailyBriefing.absent} absent • Tap exceptions` : 'All present • Tap exceptions'}
-            </small>
+        {/* ── Compact Teacher Quick Action Ribbon ─────────────────────────────── */}
+        <div className="teacher-action-ribbon">
+          <button onClick={() => setIsAddLearnerOpen(true)} className="ribbon-btn">
+            ➕ Add Learner
           </button>
-
-          <button
-            onClick={() => setIsAddLearnerOpen(true)}
-            className="teacher-action-card"
-          >
-            <span className="teacher-action-title">➕ Add Learner</span>
-            <small className="teacher-action-sub">
-              3-click class enrollment
-            </small>
+          <button onClick={() => handleOpenAddRecord('assessment')} className="ribbon-btn">
+            📝 Enter Scores
           </button>
-
-          <button
-            onClick={() => handleOpenAddRecord('assessment')}
-            className="teacher-action-card"
-          >
-            <span className="teacher-action-title">📝 Record Marks</span>
-            <small className="teacher-action-sub">
-              Quick test & exam scores
-            </small>
-          </button>
-
-          <button
-            onClick={() => handleOpenAddRecord('observation')}
-            className="teacher-action-card"
-          >
-            <span className="teacher-action-title">🔍 Add Observation</span>
-            <small className="teacher-action-sub">
-              Note progress or mistake
-            </small>
+          <button onClick={() => handleOpenAddRecord('observation')} className="ribbon-btn">
+            🔍 Add Note
           </button>
         </div>
 
-        {/* ── Optional Quick Attendance Checklist Drawer ──────────────────────── */}
-        {attendanceRollOpen && (
-          <div className="panel attendance-roll-panel" style={{ marginBottom: 24, padding: '16px 20px', border: '2px solid var(--ink)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-              <div>
-                <strong style={{ fontSize: 15 }}>Today's Roll Call ({todayDateLabel()})</strong>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                  Presence is default. Tap any learner to toggle absent.
-                </div>
-              </div>
-              <button
-                className="secondary"
-                style={{ padding: '6px 12px', fontSize: 12, borderRadius: 8 }}
-                onClick={() => setAttendanceRollOpen(false)}
-              >
-                Done
-              </button>
-            </div>
+        {/* ── Direct Attendance Class Roster (Zero Horizontal Scroll) ──────────── */}
+        <div className="teacher-roster-panel">
+          <div className="roster-search-head">
+            <input
+              type="text"
+              placeholder="Search learner in class..."
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              className="roster-search-input"
+            />
+          </div>
 
-            <div className="roll-call-grid">
-              {learners.map((learner) => {
-                const isAbsent = dailyBriefing.absentLearnerIds.includes(learner.id);
-                return (
-                  <div
-                    key={learner.id}
-                    onClick={() => onToggleAttendance(todayKey, learner.id)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '8px 12px',
-                      borderRadius: 8,
-                      border: isAbsent ? '1.5px solid #dc2626' : '1px solid var(--border)',
-                      background: isAbsent ? '#fef2f2' : 'var(--surface)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div>
-                      <strong style={{ fontSize: 13, color: isAbsent ? '#991b1b' : 'var(--ink)' }}>
-                        {learner.fullName}
-                      </strong>
+          <div className="teacher-learner-list">
+            {filteredClassLearners.map((learner) => {
+              const isAbsent = dailyBriefing.absentLearnerIds.includes(learner.id);
+              return (
+                <div
+                  key={learner.id}
+                  className={`teacher-learner-card ${isAbsent ? 'learner-absent' : 'learner-present'}`}
+                  onClick={() => onSelectLearner(learner.id)}
+                  title="Tap to view complete learner dossier"
+                >
+                  <div className="learner-info-col">
+                    <div className="learner-card-name">
+                      <strong>{learner.fullName}</strong>
                       {learner.admissionNumber && (
-                        <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 6 }}>
-                          #{learner.admissionNumber}
-                        </span>
+                        <span className="learner-adm-badge">#{learner.admissionNumber}</span>
                       )}
                     </div>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        padding: '2px 6px',
-                        borderRadius: 4,
-                        background: isAbsent ? '#dc2626' : 'var(--good)',
-                        color: '#fff',
-                      }}
-                    >
-                      {isAbsent ? 'ABSENT' : 'PRESENT'}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ── My Class Roster (Clean, searchable, tap to view dossier) ────────── */}
-        <div className="panel" style={{ padding: 0, overflow: 'hidden', marginBottom: 24 }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-            <div>
-              <h3 style={{ margin: 0, fontSize: 16 }}>Class Learners ({learners.length})</h3>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                Click any learner to view their complete dossier & evidence history
-              </div>
-            </div>
-            <div className="roster-header-actions">
-              <input
-                type="text"
-                placeholder="Search learner..."
-                value={searchFilter}
-                onChange={(e) => setSearchFilter(e.target.value)}
-                className="search roster-search-input"
-              />
-              <button
-                type="button"
-                onClick={() => setIsAddLearnerOpen(true)}
-                className="btn-add-learner-compact"
-              >
-                + Add Learner
-              </button>
-            </div>
-          </div>
-
-          <div className="table-responsive">
-            <table className="sheet-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '40px', textAlign: 'center' }}>#</th>
-                  <th>Learner Name</th>
-                  <th>Adm No</th>
-                  <th>Gender</th>
-                  <th>Guardian</th>
-                  <th style={{ textAlign: 'right' }}>Today's Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredClassLearners.map((learner, idx) => {
-                  const isAbsent = dailyBriefing.absentLearnerIds.includes(learner.id);
-                  return (
-                    <tr
-                      key={learner.id}
-                      className="sheet-row"
-                      onClick={() => onSelectLearner(learner.id)}
-                      title="Click to view complete learner memory"
-                    >
-                      <td style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 11 }}>
-                        {idx + 1}
-                      </td>
-                      <td className="sheet-name-cell">
-                        <strong>{learner.fullName}</strong>
-                      </td>
-                      <td>
-                        <span className="sheet-adm">{learner.admissionNumber || '—'}</span>
-                      </td>
-                      <td>{learner.gender || '—'}</td>
-                      <td>
-                        <span className="sheet-guardian">{learner.guardianName || '—'}</span>
-                      </td>
-                      <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                        <button
-                          className={`mini-toggle-btn ${isAbsent ? 'toggle-absent' : 'toggle-present'}`}
-                          onClick={() => onToggleAttendance(todayKey, learner.id)}
-                        >
-                          {isAbsent ? 'Absent' : 'Present'}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* ── Recent Class Activity ───────────────────────────────────────────── */}
-        <div className="panel" style={{ padding: '16px 20px' }}>
-          <h4 style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--ink)' }}>Recent Activity</h4>
-          {recentEvents.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {recentEvents.map(ev => {
-                const learner = ev.learnerId ? learnerMap.get(ev.learnerId) : null;
-                return (
-                  <div
-                    key={ev.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      fontSize: 13,
-                      padding: '6px 0',
-                      borderBottom: '1px solid var(--line)',
-                    }}
-                  >
-                    <div>
-                      <span className="tag" style={{ marginRight: 8, fontSize: 10 }}>{ev.type}</span>
-                      <strong>{learner ? learner.fullName : 'Class-wide'}</strong>
-                      <span style={{ color: 'var(--muted)', marginLeft: 6 }}>
-                        {ev.source || ev.action}
-                      </span>
+                    <div className="learner-card-sub">
+                      Tap name for dossier & evidence
                     </div>
-                    <small style={{ color: 'var(--muted)' }}>{timeLabel(ev.createdAt)}</small>
                   </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div style={{ color: 'var(--muted)', fontSize: 12 }}>No activity recorded yet today.</div>
-          )}
+
+                  {/* Dedicated 44px Direct Attendance Toggle Button */}
+                  <button
+                    type="button"
+                    className={`btn-attendance-toggle ${isAbsent ? 'btn-absent' : 'btn-present'}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleAttendance(todayKey, learner.id);
+                    }}
+                    title={isAbsent ? 'Tap to mark Present' : 'Tap to mark Absent'}
+                  >
+                    {isAbsent ? 'ABSENT' : 'PRESENT'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Modal: Add Record / Add Observation / Assessment */}
+        {/* Modals */}
         <AddRecordModal
           isOpen={isAddRecordOpen}
           onClose={() => setIsAddRecordOpen(false)}
@@ -351,7 +200,6 @@ export default function TodayView({
           initialType={recordInitialType}
         />
 
-        {/* Modal: 3-Click Add Learner */}
         <AddLearnerModal
           isOpen={isAddLearnerOpen}
           onClose={() => setIsAddLearnerOpen(false)}
@@ -361,7 +209,7 @@ export default function TodayView({
           onAddLearner={onAddLearner}
           onToast={onToast}
         />
-        {/* Modal: Official Landscape Result Sheet */}
+
         <LandscapeResultSheetModal
           isOpen={isLandscapeSheetOpen}
           onClose={() => setIsLandscapeSheetOpen(false)}
@@ -375,169 +223,276 @@ export default function TodayView({
   }
 
   // ═════════════════════════════════════════════════════════════════════════════
-  // 2. HEADTEACHER SURFACE: "SCHOOL" (Full overview, absentee tracking, search)
+  // 2. HEADTEACHER SURFACE: "SCHOOL INTELLIGENCE PORTAL"
   // ═════════════════════════════════════════════════════════════════════════════
+  const { briefing } = intelligence;
+  const pulse = briefing.pulse;
+
   return (
-    <section className="view active">
-      <div className="top" style={{ marginBottom: 16 }}>
+    <section className="view active headteacher-view-container">
+      {/* Top Header */}
+      <div className="headteacher-header-bar">
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800 }}>School Overview</h1>
-          <div className="sub" style={{ fontSize: 13, color: 'var(--muted)' }}>
-            {activeSchool?.name || "St. Mary's"} • {learners.length} Registered Learners
+          <h1 className="headteacher-title">School Intelligence</h1>
+          <div className="headteacher-subtitle">
+            {activeSchool?.name || "St. Mary's School"} • {todayDateLabel()}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => setIsLandscapeSheetOpen(true)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '7px 12px',
-              borderRadius: 8,
-              border: '1.5px solid var(--border)',
-              background: 'var(--surface)',
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer',
-              color: 'var(--ink)',
-            }}
-            title="View & Print Official Landscape Result Sheet"
-          >
-            📄 Academic Result Sheet
-          </button>
-          <div className="date">{todayDateLabel()}</div>
-        </div>
+        <button
+          onClick={() => setIsLandscapeSheetOpen(true)}
+          className="btn-sheet-trigger"
+          title="View & Print Official Landscape Result Sheet"
+        >
+          📄 Result Sheet
+        </button>
       </div>
 
-      {/* Headteacher Stats Bar */}
-      <div className="stats" style={{ marginBottom: 20 }}>
-        <div
-          className={`stat stat-interactive ${activeFilter === 'all' ? 'stat-active' : ''}`}
-          onClick={() => setActiveFilter(activeFilter === 'all' ? null : 'all')}
-        >
-          <div className="n">{dailyBriefing.total}</div>
-          <div className="l">Total Registered ▾</div>
+      {/* ── 1. School Pulse (Grounded in Verified Records) ────────────────────── */}
+      <div className="school-pulse-grid">
+        <div className="pulse-metric-card pulse-rate">
+          <div className="pulse-value">{pulse.attendanceRate}%</div>
+          <div className="pulse-label">Attendance Rate Today</div>
         </div>
 
-        <div
-          className={`stat stat-interactive ${activeFilter === 'present' ? 'stat-active' : ''}`}
-          onClick={() => setActiveFilter(activeFilter === 'present' ? null : 'present')}
-        >
-          <div className="n present-n">{dailyBriefing.present}</div>
-          <div className="l">Present (Derived) ▾</div>
-        </div>
-
-        <div
-          className={`stat stat-interactive ${activeFilter === 'absent' ? 'stat-active' : ''}`}
+        <div 
+          className={`pulse-metric-card ${pulse.confirmedAbsentCount > 0 ? 'pulse-warning' : ''}`}
           onClick={() => setActiveFilter(activeFilter === 'absent' ? null : 'absent')}
+          style={{ cursor: 'pointer' }}
+          title="Tap to review absent learners"
         >
-          <div className="n absent-n">{dailyBriefing.absent}</div>
-          <div className="l">Absent Today ▾</div>
+          <div className="pulse-value">{pulse.confirmedAbsentCount}</div>
+          <div className="pulse-label">Absent Today {activeFilter === 'absent' ? '▴' : '▾'}</div>
         </div>
 
-        <div className="stat">
-          <div className="n">{dailyBriefing.attendanceRate}%</div>
-          <div className="l">School Rate</div>
+        <div className="pulse-metric-card">
+          <div className="pulse-value">{pulse.recordedLearnersCount} / {pulse.enrolledCount}</div>
+          <div className="pulse-label">Recorded Coverage</div>
+        </div>
+
+        <div 
+          className={`pulse-metric-card ${pulse.outstandingClassesCount > 0 ? 'pulse-alert' : ''}`}
+          onClick={() => setActiveFilter(activeFilter === 'outstanding' ? null : 'outstanding')}
+          style={{ cursor: 'pointer' }}
+          title="Tap to see outstanding class registers"
+        >
+          <div className="pulse-value">{pulse.submittedClassesCount} / {pulse.totalClasses}</div>
+          <div className="pulse-label">Registers Submitted {activeFilter === 'outstanding' ? '▴' : '▾'}</div>
         </div>
       </div>
 
-      {/* Natural Language Composer */}
-      <WhatHappenedComposer
-        schoolMemory={schoolMemory}
-        onCommitEvent={onCommitEvent}
-        onToast={onToast}
-      />
-
-      {/* Class & Learner Inspector */}
-      {activeFilter && (
-        <div className="panel" style={{ marginTop: 20, padding: 0, overflow: 'hidden' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--line)', flexWrap: 'wrap', gap: 10 }}>
-            <div>
-              <h2 style={{ margin: 0, fontSize: 16 }}>
-                {activeFilter === 'absent' && `Today's Absentees Across School (${dailyBriefing.absent})`}
-                {activeFilter === 'present' && `Present Learners (${dailyBriefing.present})`}
-                {activeFilter === 'all' && `All School Learners (${learners.length})`}
-              </h2>
-            </div>
-
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <select
-                className="class-select-dropdown"
-                value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
-              >
-                <option value="ALL">All Classes ({learners.length})</option>
-                {classesList.map((cls) => (
-                  <option key={cls} value={cls}>{cls}</option>
-                ))}
-              </select>
-
-              <input
-                type="text"
-                className="search"
-                style={{ padding: '6px 12px', fontSize: 13, width: 160 }}
-                placeholder="Filter name..."
-                value={searchFilter}
-                onChange={(e) => setSearchFilter(e.target.value)}
-              />
-            </div>
+      {/* ── Filtered Attention Panel: Absent Learners or Outstanding Classes ───── */}
+      {activeFilter === 'absent' && (
+        <div className="intelligence-detail-card" style={{ marginBottom: 20 }}>
+          <div className="detail-card-head">
+            <strong>Today's Absent Learners ({intelligence.todayAbsentees.length})</strong>
+            <button className="btn-close-compact" onClick={() => setActiveFilter(null)}>✕</button>
           </div>
-
-          <div className="table-responsive">
-            <table className="sheet-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '40px', textAlign: 'center' }}>#</th>
-                  <th>Adm No</th>
-                  <th>Learner Name</th>
-                  <th>Class</th>
-                  <th>Guardian</th>
-                  <th>Contact</th>
-                  <th style={{ textAlign: 'right' }}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {learners
-                  .filter(l => selectedClass === 'ALL' || l.className === selectedClass)
-                  .filter(l => {
-                    const isAbsent = dailyBriefing.absentLearnerIds.includes(l.id);
-                    if (activeFilter === 'absent') return isAbsent;
-                    if (activeFilter === 'present') return !isAbsent;
-                    return true;
-                  })
-                  .map((learner, idx) => {
-                    const isAbsent = dailyBriefing.absentLearnerIds.includes(learner.id);
-                    return (
-                      <tr
-                        key={learner.id}
-                        className="sheet-row"
-                        onClick={() => onSelectLearner(learner.id)}
+          {intelligence.todayAbsentees.length > 0 ? (
+            <div className="absentee-list">
+              {intelligence.todayAbsentees.map(l => (
+                <div key={l.id} className="absentee-row" onClick={() => onSelectLearner(l.id)}>
+                  <div>
+                    <strong>{l.fullName}</strong>
+                    <div className="absentee-meta">{l.className} • Adm: #{l.admissionNumber || '—'}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {l.guardianPhone && (
+                      <a 
+                        href={`tel:${l.guardianPhone}`} 
+                        className="btn-call-guardian"
+                        onClick={(e) => e.stopPropagation()}
+                        title={`Call Guardian: ${l.guardianPhone}`}
                       >
-                        <td style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 11 }}>{idx + 1}</td>
-                        <td><span className="sheet-adm">{learner.admissionNumber || '—'}</span></td>
-                        <td className="sheet-name-cell"><strong>{learner.fullName}</strong></td>
-                        <td><span className="sheet-badge">{learner.className}</span></td>
-                        <td><span className="sheet-guardian">{learner.guardianName || '—'}</span></td>
-                        <td style={{ fontSize: 12, color: 'var(--muted)' }}>{learner.guardianPhone || '—'}</td>
-                        <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                          <button
-                            className={`mini-toggle-btn ${isAbsent ? 'toggle-absent' : 'toggle-present'}`}
-                            onClick={() => onToggleAttendance(todayKey, learner.id)}
-                          >
-                            {isAbsent ? 'Mark Present' : 'Mark Absent'}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
+                        📞 Call
+                      </a>
+                    )}
+                    <button
+                      className="mini-toggle-btn toggle-absent"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleAttendance(todayKey, l.id);
+                      }}
+                      title="Tap to mark present"
+                    >
+                      Mark Present
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty" style={{ padding: 12 }}>No absent learners recorded in submitted registers.</div>
+          )}
         </div>
       )}
 
-      {/* Modal: Official Landscape Result Sheet */}
+      {activeFilter === 'outstanding' && (
+        <div className="intelligence-detail-card" style={{ marginBottom: 20 }}>
+          <div className="detail-card-head">
+            <strong>Classes with Outstanding Attendance Registers ({intelligence.outstandingClasses.length})</strong>
+            <button className="btn-close-compact" onClick={() => setActiveFilter(null)}>✕</button>
+          </div>
+          {intelligence.outstandingClasses.length > 0 ? (
+            <div className="outstanding-list">
+              {intelligence.outstandingClasses.map(cls => (
+                <div key={cls.classId || cls.className} className="outstanding-row">
+                  <div>
+                    <strong>{cls.className}</strong>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                      {cls.totalLearners} learners pending register submission
+                    </div>
+                  </div>
+                  <span className="tag alert">Not Submitted</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty" style={{ padding: 12 }}>All class registers have been submitted today.</div>
+          )}
+        </div>
+      )}
+
+      {/* ── 2. The 4-Question Headteacher Intelligence Briefing ────────────────── */}
+      <div className="briefing-container">
+        <h3 className="briefing-section-title">Daily School Briefing</h3>
+
+        <div className="briefing-box">
+          {/* Question 1: What Happened */}
+          <div className="briefing-item">
+            <div className="briefing-item-head">
+              <span className="briefing-bullet">●</span>
+              <strong>What Happened Today</strong>
+            </div>
+            <ul className="briefing-list">
+              {briefing.whatHappened.map((st, i) => (
+                <li key={i}>{st}</li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Question 2: What Needs Attention */}
+          {briefing.whatNeedsAttention.length > 0 && (
+            <div className="briefing-item briefing-attention-item">
+              <div className="briefing-item-head">
+                <span className="briefing-bullet alert">⚠️</span>
+                <strong>What Needs Attention</strong>
+              </div>
+              <div className="briefing-attention-cards">
+                {briefing.whatNeedsAttention.map((item, idx) => (
+                  <div key={idx} className="attention-card">
+                    <div className="attention-card-text">
+                      <strong className="attention-card-title">{item.title}</strong>
+                      <div className="attention-card-desc">{item.detail}</div>
+                    </div>
+                    {item.actionType === 'view_absentees' && (
+                      <button 
+                        className="btn-attention-action"
+                        onClick={() => setActiveFilter('absent')}
+                      >
+                        {item.actionLabel}
+                      </button>
+                    )}
+                    {item.actionType === 'filter_outstanding' && (
+                      <button 
+                        className="btn-attention-action"
+                        onClick={() => setActiveFilter('outstanding')}
+                      >
+                        {item.actionLabel}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Question 3: What To Do Next */}
+          <div className="briefing-item">
+            <div className="briefing-item-head">
+              <span className="briefing-bullet action">➔</span>
+              <strong>Recommended Action</strong>
+            </div>
+            <ul className="briefing-list">
+              {briefing.whatToDo.map((todo, i) => (
+                <li key={i}>{todo}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 3. Chronological School Activity Stream ─────────────────────────── */}
+      <div className="activity-stream-container">
+        <div className="activity-stream-head">
+          <h3 className="activity-title">Live School Activity Stream</h3>
+          
+          {/* Activity Category Filters */}
+          <div className="activity-filter-pills">
+            <button 
+              className={`pill ${activityCategory === 'all' ? 'active' : ''}`}
+              onClick={() => setActivityCategory('all')}
+            >
+              All
+            </button>
+            <button 
+              className={`pill ${activityCategory === 'attendance' ? 'active' : ''}`}
+              onClick={() => setActivityCategory('attendance')}
+            >
+              Attendance
+            </button>
+            <button 
+              className={`pill ${activityCategory === 'assessment' ? 'active' : ''}`}
+              onClick={() => setActivityCategory('assessment')}
+            >
+              Assessments
+            </button>
+            <button 
+              className={`pill ${activityCategory === 'incident' ? 'active' : ''}`}
+              onClick={() => setActivityCategory('incident')}
+            >
+              Incidents & Notes
+            </button>
+          </div>
+        </div>
+
+        {filteredActivities.length > 0 ? (
+          <div className="activity-feed-list">
+            {filteredActivities.map((act) => (
+              <div 
+                key={act.id} 
+                className="activity-feed-item"
+                onClick={() => act.action?.payload && onSelectLearner(act.action.payload)}
+              >
+                <div className="activity-item-icon">{act.icon}</div>
+                <div className="activity-item-content">
+                  <div className="activity-item-top">
+                    <span className="activity-item-title">{act.title}</span>
+                    <span className="activity-item-time">{act.timestamp}</span>
+                  </div>
+                  <div className="activity-item-sub">{act.subtitle}</div>
+                </div>
+                {act.action && (
+                  <button 
+                    className="btn-activity-action"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (act.action.payload) onSelectLearner(act.action.payload);
+                    }}
+                  >
+                    {act.action.label}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty" style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>
+            No recorded activities matching this filter.
+          </div>
+        )}
+      </div>
+
+      {/* Landscape Result Sheet Modal */}
       <LandscapeResultSheetModal
         isOpen={isLandscapeSheetOpen}
         onClose={() => setIsLandscapeSheetOpen(false)}

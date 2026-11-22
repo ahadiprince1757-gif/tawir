@@ -277,7 +277,61 @@ export default function LearnersView({
       )}
 
       <div className="panel" style={{ marginTop: 14, padding: 0, overflow: 'hidden' }}>
-        <div className="table-responsive">
+        {/* ── Mobile Touch-First Learner Cards (Screen <= 820px, 0 Horizontal Scroll) ── */}
+        <div className="mobile-learners-card-list">
+          {filtered.length > 0 ? (
+            filtered.map((learner) => {
+              const mem = schoolMemory.assembleLearnerMemory(learner.id);
+              const att = mem?.attendance;
+              const pct = att && att.totalSchoolDays > 0 ? att.percentage : 100;
+              const isGood = pct >= 85;
+
+              return (
+                <div
+                  key={learner.id}
+                  className="mobile-learner-directory-card"
+                  onClick={() => onSelectLearner(learner.id)}
+                  title="Tap to view complete learner dossier"
+                >
+                  <div className="mobile-card-top">
+                    <div>
+                      <strong className="mobile-card-name">{learner.fullName}</strong>
+                      <div className="mobile-card-adm">
+                        #{learner.admissionNumber || '—'} • <span className="mobile-card-class">{learner.className}</span>
+                      </div>
+                    </div>
+                    <span className={`sheet-att-pill ${isGood ? 'att-good' : 'att-warn'}`}>
+                      {pct}% Att.
+                    </span>
+                  </div>
+
+                  <div className="mobile-card-actions">
+                    <span className="mobile-card-guardian">
+                      {learner.guardianName ? `Guardian: ${learner.guardianName}` : 'No guardian contact'}
+                    </span>
+                    {learner.guardianPhone && (
+                      <a
+                        href={`tel:${learner.guardianPhone}`}
+                        className="btn-call-compact"
+                        onClick={(e) => e.stopPropagation()}
+                        title={`Call Guardian: ${learner.guardianPhone}`}
+                      >
+                        📞 Call
+                      </a>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="empty" style={{ padding: 20 }}>
+              No learners matching "<strong>{query}</strong>"{selectedClass !== 'ALL' ? ` in ${selectedClass}` : ''}.
+            </div>
+          )}
+        </div>
+
+        {/* ── Desktop Spreadsheet Table (Screen > 820px) ── */}
+        <div className="table-responsive desktop-only-table">
           <table className="sheet-table">
             <thead>
               <tr>

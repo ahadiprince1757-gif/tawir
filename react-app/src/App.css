@@ -2049,3 +2049,652 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
 .suggestion-pill:hover {
   background: #dbeafe;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PHASE 2: MOBILE INTERFACE DECLUTTER & HEADTEACHER INTELLIGENCE PORTAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Teacher Interface Components ── */
+.teacher-view-container {
+  padding-bottom: 24px;
+}
+
+.teacher-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.teacher-class-title {
+  font-size: 22px;
+  font-weight: 850;
+  margin: 0;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+
+.teacher-class-meta {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.teacher-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-sheet-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-sheet-trigger:hover {
+  background: var(--soft);
+  border-color: var(--ink);
+}
+
+.teacher-date-badge {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+  background: var(--soft);
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+/* Compact Teacher Quick Action Ribbon */
+.teacher-action-ribbon {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ribbon-btn {
+  flex: 1;
+  min-width: 105px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.ribbon-btn:active {
+  transform: scale(0.97);
+  background: var(--soft);
+}
+
+/* Teacher Class Roster Touch List */
+.teacher-roster-panel {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.roster-search-head {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.roster-search-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: #ffffff;
+  font-size: 14px;
+  color: var(--ink);
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.roster-search-input:focus {
+  border-color: var(--ink);
+}
+
+.teacher-learner-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.teacher-learner-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.teacher-learner-card:last-child {
+  border-bottom: none;
+}
+
+.teacher-learner-card:active {
+  background: var(--soft);
+}
+
+.learner-info-col {
+  flex: 1;
+  min-width: 0;
+  padding-right: 12px;
+}
+
+.learner-card-name {
+  font-size: 14px;
+  font-weight: 750;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.learner-adm-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.learner-card-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* Direct Attendance 44px Touch Button */
+.btn-attendance-toggle {
+  min-height: 44px;
+  min-width: 84px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-attendance-toggle:active {
+  transform: scale(0.95);
+}
+
+.btn-present {
+  background: #eef7ed;
+  color: #1e5a2b;
+  border: 1.5px solid #a3d9a5;
+}
+
+.btn-absent {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1.5px solid #f87171;
+}
+
+/* ── 2. Headteacher School Intelligence Portal ── */
+.headteacher-view-container {
+  padding-bottom: 24px;
+}
+
+.headteacher-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.headteacher-title {
+  font-size: 22px;
+  font-weight: 850;
+  margin: 0;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+
+.headteacher-subtitle {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* School Pulse Grid */
+.school-pulse-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.pulse-metric-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.pulse-metric-card .pulse-value {
+  font-size: 20px;
+  font-weight: 850;
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+.pulse-metric-card .pulse-label {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.pulse-rate .pulse-value {
+  color: #1e5a2b;
+}
+
+.pulse-warning {
+  border-color: #fca5a5;
+  background: #fffafa;
+}
+
+.pulse-warning .pulse-value {
+  color: #b91c1c;
+}
+
+.pulse-alert {
+  border-color: #fde68a;
+  background: #fffdf5;
+}
+
+.pulse-alert .pulse-value {
+  color: #b45309;
+}
+
+/* Detail Attention Card */
+.intelligence-detail-card {
+  background: #ffffff;
+  border: 1.5px solid var(--ink);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.detail-card-head {
+  padding: 10px 14px;
+  background: var(--soft);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.btn-close-compact {
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 2px 6px;
+}
+
+.absentee-list, .outstanding-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.absentee-row, .outstanding-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.absentee-row:last-child, .outstanding-row:last-child {
+  border-bottom: none;
+}
+
+.absentee-meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.btn-call-guardian, .btn-call-compact {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 750;
+  text-decoration: none;
+  border: 1px solid #bfdbfe;
+}
+
+/* Headteacher Briefing Box */
+.briefing-container {
+  margin-bottom: 22px;
+}
+
+.briefing-section-title {
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0 0 10px;
+  color: var(--ink);
+}
+
+.briefing-box {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.briefing-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.briefing-bullet {
+  color: #1e5a2b;
+  font-size: 12px;
+}
+
+.briefing-bullet.alert {
+  color: #b91c1c;
+}
+
+.briefing-bullet.action {
+  color: #2563eb;
+}
+
+.briefing-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.briefing-attention-item {
+  background: #fffafa;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.briefing-attention-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.attention-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  padding: 8px 12px;
+  gap: 10px;
+}
+
+.attention-card-title {
+  font-size: 12px;
+  display: block;
+  color: #991b1b;
+}
+
+.attention-card-desc {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.btn-attention-action {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #b91c1c;
+  color: #ffffff;
+  border: none;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Activity Stream */
+.activity-stream-container {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.activity-stream-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+}
+
+.activity-title {
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0;
+  color: var(--ink);
+}
+
+.activity-filter-pills {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+}
+
+.activity-filter-pills .pill {
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.activity-filter-pills .pill.active {
+  background: var(--ink);
+  color: #ffffff;
+  border-color: var(--ink);
+}
+
+.activity-feed-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.activity-feed-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.activity-feed-item:last-child {
+  border-bottom: none;
+}
+
+.activity-item-icon {
+  font-size: 16px;
+  line-height: 1;
+  padding-top: 2px;
+  flex-shrink: 0;
+}
+
+.activity-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.activity-item-title {
+  font-size: 13px;
+  font-weight: 750;
+  color: var(--ink);
+}
+
+.activity-item-time {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.activity-item-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.btn-activity-action {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--soft);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: center;
+}
+
+/* ── 3. Mobile Learner Directory Cards (<= 820px) ── */
+.mobile-learners-card-list {
+  display: none;
+  flex-direction: column;
+}
+
+.mobile-learner-directory-card {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.mobile-learner-directory-card:active {
+  background: var(--soft);
+}
+
+.mobile-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.mobile-card-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.mobile-card-adm {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.mobile-card-class {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.mobile-card-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.mobile-card-guardian {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Responsive Swapping for Mobile Directory */
+@media (max-width: 820px) {
+  .desktop-only-table {
+    display: none !important;
+  }
+  .mobile-learners-card-list {
+    display: flex !important;
+  }
+}
