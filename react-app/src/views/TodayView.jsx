@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import WhatHappenedComposer from '../components/WhatHappenedComposer.jsx';
 import AddRecordModal from '../components/AddRecordModal.jsx';
 import AddLearnerModal from '../components/AddLearnerModal.jsx';
+import LandscapeResultSheetModal from '../components/LandscapeResultSheetModal.jsx';
 import { todayDateKey, todayDateLabel, timeLabel } from '../utils/formatters.js';
 
 export default function TodayView({
@@ -26,6 +27,7 @@ export default function TodayView({
   // Teacher Quick Modal State
   const [isAddRecordOpen, setIsAddRecordOpen] = useState(false);
   const [isAddLearnerOpen, setIsAddLearnerOpen] = useState(false);
+  const [isLandscapeSheetOpen, setIsLandscapeSheetOpen] = useState(false);
   const [recordInitialType, setRecordInitialType] = useState('observation');
 
   // Attendance & Filtering State
@@ -82,15 +84,35 @@ export default function TodayView({
     return (
       <section className="view active">
         {/* Minimal Class Header */}
-        <div className="page-head" style={{ marginBottom: 20 }}>
+        <div className="page-head" style={{ marginBottom: 16 }}>
           <div>
-            <div className="eyebrow">Classroom Workbench</div>
-            <h1 style={{ fontSize: 26, fontWeight: 800 }}>{currentUser.className || 'My Class'}</h1>
-            <div className="sub" style={{ fontSize: 14 }}>
-              {learners.length} registered learners • Teacher: {currentUser.name}
+            <h1 style={{ fontSize: 24, fontWeight: 800 }}>{currentUser.className || 'My Class'}</h1>
+            <div className="sub" style={{ fontSize: 13, color: 'var(--muted)' }}>
+              {learners.length} Learners • {currentUser.name}
             </div>
           </div>
-          <div className="date">{todayDateLabel()}</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setIsLandscapeSheetOpen(true)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '7px 12px',
+                borderRadius: 8,
+                border: '1.5px solid var(--border)',
+                background: 'var(--surface)',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                color: 'var(--ink)',
+              }}
+              title="View & Print Official Landscape Result Sheet"
+            >
+              📄 Class Result Sheet
+            </button>
+            <div className="date">{todayDateLabel()}</div>
+          </div>
         </div>
 
         {/* ── 4 Quick Primary Action Buttons ─────────────────────────────────── */}
@@ -339,6 +361,15 @@ export default function TodayView({
           onAddLearner={onAddLearner}
           onToast={onToast}
         />
+        {/* Modal: Official Landscape Result Sheet */}
+        <LandscapeResultSheetModal
+          isOpen={isLandscapeSheetOpen}
+          onClose={() => setIsLandscapeSheetOpen(false)}
+          learners={learners}
+          events={events}
+          activeSchool={activeSchool}
+          activeClass={activeClass}
+        />
       </section>
     );
   }
@@ -348,15 +379,35 @@ export default function TodayView({
   // ═════════════════════════════════════════════════════════════════════════════
   return (
     <section className="view active">
-      <div className="top">
+      <div className="top" style={{ marginBottom: 16 }}>
         <div>
-          <div className="eyebrow">Tawi • School Operating Memory</div>
-          <h1>School Overview</h1>
-          <div className="sub">
-            All classes, absentee monitoring, and cross-referenced learner memory.
+          <h1 style={{ fontSize: 24, fontWeight: 800 }}>School Overview</h1>
+          <div className="sub" style={{ fontSize: 13, color: 'var(--muted)' }}>
+            {activeSchool?.name || "St. Mary's"} • {learners.length} Registered Learners
           </div>
         </div>
-        <div className="date">{todayDateLabel()}</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setIsLandscapeSheetOpen(true)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '7px 12px',
+              borderRadius: 8,
+              border: '1.5px solid var(--border)',
+              background: 'var(--surface)',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              color: 'var(--ink)',
+            }}
+            title="View & Print Official Landscape Result Sheet"
+          >
+            📄 Academic Result Sheet
+          </button>
+          <div className="date">{todayDateLabel()}</div>
+        </div>
       </div>
 
       {/* Headteacher Stats Bar */}
@@ -485,6 +536,16 @@ export default function TodayView({
           </div>
         </div>
       )}
+
+      {/* Modal: Official Landscape Result Sheet */}
+      <LandscapeResultSheetModal
+        isOpen={isLandscapeSheetOpen}
+        onClose={() => setIsLandscapeSheetOpen(false)}
+        learners={learners}
+        events={events}
+        activeSchool={activeSchool}
+        activeClass={activeClass}
+      />
     </section>
   );
 }

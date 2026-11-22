@@ -197,29 +197,86 @@ export default function LearnerMemoryModal({ learnerId, schoolMemory, onClose })
           </div>
         )}
 
-        {/* ── ACADEMIC TAB ────────────────────────────────────────────────────── */}
+        {/* ── ACADEMIC TAB (Compiled Academic Record) ───────────────────────── */}
         {activeTab === 'academic' && (
           <div className="memory-section" style={{ marginTop: 10 }}>
-            <h4>Subject Assessments</h4>
-            {Object.keys(academics.subjectScores).length > 0 ? (
-              <div className="scores-list">
-                {Object.entries(academics.subjectScores).map(([sub, scores]) => (
-                  <div key={sub} className="subject-score-row" style={{ padding: '10px 14px', background: 'var(--surface)', borderRadius: 8, marginBottom: 8 }}>
-                    <div>
-                      <strong style={{ fontSize: 14 }}>{sub}</strong>
-                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                        {scores.length} {scores.length === 1 ? 'assessment' : 'assessments'} recorded
-                      </div>
-                    </div>
-                    <div className="score-tags">
-                      {scores.map((sc, i) => (
-                        <span key={i} className="score-badge" style={{ padding: '4px 10px', fontSize: 13 }}>
-                          {sc.score} / {sc.outOf}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+            {/* Academic Summary Hero */}
+            <div className="stats" style={{ marginBottom: 16 }}>
+              <div className="stat">
+                <div className="n">{academics.completedSubjectsCount || 0} / {academics.expectedSubjectsCount || 8}</div>
+                <div className="l">Subjects Recorded</div>
+              </div>
+              <div className="stat">
+                <div className="n present-n">{academics.formattedMean || '—'}</div>
+                <div className="l">Overall Mean</div>
+              </div>
+              <div className="stat">
+                <div className="n" style={{ fontSize: 18, color: 'var(--brand)' }}>
+                  {academics.highestSubjects?.[0]?.subjectCode || '—'}
+                </div>
+                <div className="l">
+                  Highest ({academics.highestSubjects?.[0]?.formattedPercentage || '—'})
+                </div>
+              </div>
+              <div className="stat">
+                <div className="n" style={{ fontSize: 18, color: 'var(--muted)' }}>
+                  {academics.lowestSubjects?.[0]?.subjectCode || '—'}
+                </div>
+                <div className="l">
+                  Lowest ({academics.lowestSubjects?.[0]?.formattedPercentage || '—'})
+                </div>
+              </div>
+            </div>
+
+            {/* Compiled Subject Results Table */}
+            <h4 style={{ margin: '14px 0 8px', fontSize: 14 }}>Compiled Subject Results</h4>
+            {academics.subjectResults && academics.subjectResults.length > 0 ? (
+              <div className="table-responsive" style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+                <table className="sheet-table">
+                  <thead>
+                    <tr>
+                      <th>Subject</th>
+                      <th style={{ textAlign: 'center' }}>Raw Score</th>
+                      <th style={{ textAlign: 'center' }}>Percentage</th>
+                      <th style={{ textAlign: 'center' }}>Grade</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {academics.subjectResults.map((s) => (
+                      <tr key={s.subjectCode}>
+                        <td>
+                          <strong>{s.subjectName}</strong>
+                          <span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 6 }}>({s.subjectCode})</span>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          {s.hasRecords ? `${s.rawScore} / ${s.rawOutOf}` : '—'}
+                        </td>
+                        <td style={{ textAlign: 'center', fontWeight: 700 }}>
+                          {s.formattedPercentage || '—'}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span className={`tag ${s.grade?.points >= 4 ? 'good' : s.grade?.points <= 2 ? 'alert' : ''}`}>
+                            {s.grade?.code || '—'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background: 'var(--soft)', fontWeight: 800 }}>
+                      <td>Total & Overall Mean</td>
+                      <td style={{ textAlign: 'center' }}>
+                        {academics.totalOutOf > 0 ? `${academics.totalScore} / ${academics.totalOutOf}` : '—'}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        {academics.formattedMean || '—'}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span className="tag good">{academics.overallGrade?.code || '—'}</span>
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             ) : (
               <div className="empty">No academic scores recorded yet.</div>

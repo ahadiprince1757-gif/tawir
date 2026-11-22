@@ -168,8 +168,8 @@ export default function Sidebar({
             Learners ({learnerCount})
           </button>
 
-          {/* Smart Sheet is visible to Platform Admin & Headteacher, hidden from teachers */}
-          {(isPlatformAdmin || isHeadteacher) && (
+          {/* Smart Sheet is strictly for Super Admin (Platform Admin) */}
+          {isPlatformAdmin && (
             <button className={view === 'smartsheet' ? 'active' : ''} onClick={() => onNavigate('smartsheet')}>
               Smart Sheet (Bulk Ingest)
             </button>

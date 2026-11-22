@@ -472,8 +472,8 @@ export default function App() {
           />
         )}
 
-        {/* Smart Sheet (Bulk Ingestion for Super Admin / Headteacher) */}
-        {view === 'smartsheet' && (
+        {/* Smart Sheet (Strictly Super Admin / Platform Admin only) */}
+        {view === 'smartsheet' && isPlatformAdmin && (
           <SmartSheetView
             existingLearners={scopedLearners}
             currentUser={currentUser}

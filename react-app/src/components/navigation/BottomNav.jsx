@@ -39,16 +39,19 @@ export default function BottomNav({
         {learnerCount > 0 && <span className="bottom-nav-badge">{learnerCount}</span>}
       </button>
 
-      <button 
-        className={`bottom-nav-btn ${view === 'smartsheet' ? 'active' : ''}`}
-        onClick={() => onNavigate('smartsheet')}
-        type="button"
-      >
-        <span className="bottom-nav-icon">
-          <FileTextIcon size={20} />
-        </span>
-        <span className="bottom-nav-label">Smart Sheet</span>
-      </button>
+      {/* Smart Sheet is STRICTLY for Super Admin (Platform Admin) */}
+      {isPlatformAdmin && (
+        <button 
+          className={`bottom-nav-btn ${view === 'smartsheet' ? 'active' : ''}`}
+          onClick={() => onNavigate('smartsheet')}
+          type="button"
+        >
+          <span className="bottom-nav-icon">
+            <FileTextIcon size={20} />
+          </span>
+          <span className="bottom-nav-label">Smart Sheet</span>
+        </button>
+      )}
 
       {showRecords && (
         <button 

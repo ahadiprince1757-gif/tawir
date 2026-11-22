@@ -9,6 +9,8 @@
 import { processInput } from '../events/eventEngine.js';
 import { getLearnerAttendanceProfile, calculateDailyAttendance } from '../attendance/attendanceEngine.js';
 import { EVENT_TYPES, CLASSWORK_ACTIONS, INCIDENT_ACTIONS } from '../database/schema.js';
+import { compileLearnerRecord } from '../../features/academic-records/engine/learnerCompiler.js';
+import { CANONICAL_SUBJECTS, normalizeSubject } from '../../features/academic-records/models/subjects.js';
 
 export class SchoolMemory {
   constructor(learners = [], events = []) {
@@ -47,18 +49,31 @@ export class SchoolMemory {
     const completedWork = classworkEvents.filter(e => e.action === CLASSWORK_ACTIONS.COMPLETED).length;
     const incompleteWork = classworkEvents.filter(e => e.action === CLASSWORK_ACTIONS.INCOMPLETE).length;
 
-    // 3. Academics / Assessments
+    // 3. Official Compiled Academic Records (Calculated by Academic Records Engine)
     const assessmentEvents = this.events.filter(
       e => e.type === EVENT_TYPES.ASSESSMENT && e.learnerId === learnerId
     );
-    const subjectScores = {};
+    
+    const subjectMap = new Map();
     for (const ev of assessmentEvents) {
       if (ev.value && ev.value.subject) {
-        const sub = ev.value.subject;
-        if (!subjectScores[sub]) subjectScores[sub] = [];
-        subjectScores[sub].push(ev.value);
+        const subObj = normalizeSubject(ev.value.subject);
+        const code = subObj ? subObj.code : 'UNKNOWN';
+        if (!subjectMap.has(code)) subjectMap.set(code, []);
+        subjectMap.get(code).push({
+          score: Number(ev.value.score),
+          outOf: Number(ev.value.outOf || 100),
+          title: ev.value.topic || ev.source || 'Assessment',
+          date: ev.date,
+        });
       }
     }
+
+    const compiledAcademicRecord = compileLearnerRecord({
+      learner,
+      subjectAssessmentsMap: subjectMap,
+      expectedSubjects: CANONICAL_SUBJECTS,
+    });
 
     // 4. Behaviour / Incidents
     const incidentEvents = this.events.filter(
@@ -81,7 +96,7 @@ export class SchoolMemory {
       attendance,
       academics: {
         totalAssessments: assessmentEvents.length,
-        subjectScores,
+        ...compiledAcademicRecord,
       },
       classwork: {
         completed: completedWork,

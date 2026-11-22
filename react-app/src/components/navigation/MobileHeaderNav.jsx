@@ -59,27 +59,12 @@ export default function MobileHeaderNav({
             </button>
           )}
 
-          {/* Quick Erase Button (Headteacher / Admin only) */}
-          {onOpenEraseModal && (
-            <button
-              className="mobile-header-erase-btn"
-              onClick={onOpenEraseModal}
-              title="Reset system or erase inserted data"
-              aria-label="Erase system data"
-            >
-              <TrashIcon size={14} />
-            </button>
-          )}
-
-          {/* Backend Status Indicator */}
+          {/* Backend Status Indicator (Clean dot only, zero text clutter) */}
           <div className="mobile-status-indicator" title={backendConnected ? 'Live Database Connected' : 'Working Offline'}>
             <span
               className="mobile-status-dot"
               style={{ backgroundColor: backendConnected ? '#315d43' : '#795d28' }}
             />
-            <span className="mobile-status-text">
-              {backendConnected ? 'Live' : 'Offline'}
-            </span>
           </div>
         </div>
       </header>
@@ -178,16 +163,19 @@ export default function MobileHeaderNav({
                 <span className="mobile-action-chevron">›</span>
               </button>
 
-              <button
-                className="mobile-sheet-action-btn"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onNavigate('smartsheet');
-                }}
-              >
-                <span>📋 Smart Sheet (Bulk Ingestion)</span>
-                <span className="mobile-action-chevron">›</span>
-              </button>
+              {/* Smart Sheet is strictly for Super Admin */}
+              {isPlatformAdmin && (
+                <button
+                  className="mobile-sheet-action-btn"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onNavigate('smartsheet');
+                  }}
+                >
+                  <span>📋 Smart Sheet (Bulk Ingestion)</span>
+                  <span className="mobile-action-chevron">›</span>
+                </button>
+              )}
 
               {(isPlatformAdmin || isHeadteacher) && (
                 <button
