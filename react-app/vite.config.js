@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Render backend URL — update this if your Render service URL changes
-const RENDER_BACKEND_URL = 'https://tawir-backend.onrender.com';
+// Render backend URL — live service on Render
+const RENDER_BACKEND_URL = 'https://tawir-1.onrender.com';
 
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
