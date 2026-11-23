@@ -116,7 +116,7 @@ export default function TodayView({
               className="btn-sheet-trigger"
               title="View & Print Official Landscape Result Sheet"
             >
-              📄 Result Sheet
+              Result Sheet
             </button>
             <span className="teacher-date-badge">{todayDateLabel()}</span>
           </div>
@@ -125,13 +125,13 @@ export default function TodayView({
         {/* ── Compact Teacher Quick Action Ribbon ─────────────────────────────── */}
         <div className="teacher-action-ribbon">
           <button onClick={() => setIsAddLearnerOpen(true)} className="ribbon-btn">
-            ➕ Add Learner
+            Add Learner
           </button>
           <button onClick={() => handleOpenAddRecord('assessment')} className="ribbon-btn">
-            📝 Enter Scores
+            Enter Scores
           </button>
           <button onClick={() => handleOpenAddRecord('observation')} className="ribbon-btn">
-            🔍 Add Note
+            Add Note
           </button>
         </div>
 
@@ -243,7 +243,7 @@ export default function TodayView({
           className="btn-sheet-trigger"
           title="View & Print Official Landscape Result Sheet"
         >
-          📄 Result Sheet
+          Result Sheet
         </button>
       </div>
 
@@ -285,7 +285,7 @@ export default function TodayView({
         <div className="intelligence-detail-card" style={{ marginBottom: 20 }}>
           <div className="detail-card-head">
             <strong>Today's Absent Learners ({intelligence.todayAbsentees.length})</strong>
-            <button className="btn-close-compact" onClick={() => setActiveFilter(null)}>✕</button>
+            <button className="btn-close-compact" onClick={() => setActiveFilter(null)}>x</button>
           </div>
           {intelligence.todayAbsentees.length > 0 ? (
             <div className="absentee-list">
@@ -303,7 +303,7 @@ export default function TodayView({
                         onClick={(e) => e.stopPropagation()}
                         title={`Call Guardian: ${l.guardianPhone}`}
                       >
-                        📞 Call
+                        Call
                       </a>
                     )}
                     <button
@@ -330,7 +330,7 @@ export default function TodayView({
         <div className="intelligence-detail-card" style={{ marginBottom: 20 }}>
           <div className="detail-card-head">
             <strong>Classes with Outstanding Attendance Registers ({intelligence.outstandingClasses.length})</strong>
-            <button className="btn-close-compact" onClick={() => setActiveFilter(null)}>✕</button>
+            <button className="btn-close-compact" onClick={() => setActiveFilter(null)}>x</button>
           </div>
           {intelligence.outstandingClasses.length > 0 ? (
             <div className="outstanding-list">
@@ -360,7 +360,7 @@ export default function TodayView({
           {/* Question 1: What Happened */}
           <div className="briefing-item">
             <div className="briefing-item-head">
-              <span className="briefing-bullet">●</span>
+              <span className="briefing-bullet"></span>
               <strong>What Happened Today</strong>
             </div>
             <ul className="briefing-list">
@@ -374,7 +374,7 @@ export default function TodayView({
           {briefing.whatNeedsAttention.length > 0 && (
             <div className="briefing-item briefing-attention-item">
               <div className="briefing-item-head">
-                <span className="briefing-bullet alert">⚠️</span>
+                <span className="briefing-bullet alert">!</span>
                 <strong>What Needs Attention</strong>
               </div>
               <div className="briefing-attention-cards">
@@ -409,7 +409,7 @@ export default function TodayView({
           {/* Question 3: What To Do Next */}
           <div className="briefing-item">
             <div className="briefing-item-head">
-              <span className="briefing-bullet action">➔</span>
+              <span className="briefing-bullet action">&rarr;</span>
               <strong>Recommended Action</strong>
             </div>
             <ul className="briefing-list">
@@ -463,7 +463,7 @@ export default function TodayView({
                 className="activity-feed-item"
                 onClick={() => act.action?.payload && onSelectLearner(act.action.payload)}
               >
-                <div className="activity-item-icon">{act.icon}</div>
+                {act.icon && <div className="activity-item-icon">{act.icon}</div>}
                 <div className="activity-item-content">
                   <div className="activity-item-top">
                     <span className="activity-item-title">{act.title}</span>

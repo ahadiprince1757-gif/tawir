@@ -316,7 +316,7 @@ export default function LearnersView({
                         onClick={(e) => e.stopPropagation()}
                         title={`Call Guardian: ${learner.guardianPhone}`}
                       >
-                        📞 Call
+                        Call
                       </a>
                     )}
                   </div>
@@ -345,25 +345,25 @@ export default function LearnersView({
                   />
                 </th>
                 <th className="sortable-th" onClick={() => handleSort('admissionNumber')}>
-                  Admission No {sortField === 'admissionNumber' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                  Admission No {sortField === 'admissionNumber' ? (sortDirection === 'asc' ? '^' : 'v') : ''}
                 </th>
                 <th className="sortable-th" onClick={() => handleSort('fullName')}>
-                  Learner Name {sortField === 'fullName' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                  Learner Name {sortField === 'fullName' ? (sortDirection === 'asc' ? '^' : 'v') : ''}
                 </th>
                 <th className="sortable-th" onClick={() => handleSort('className')}>
-                  Class {sortField === 'className' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                  Class {sortField === 'className' ? (sortDirection === 'asc' ? '^' : 'v') : ''}
                 </th>
                 <th className={selectedCol === 'section' ? 'col-header-selected' : ''}>
                   Sec
                 </th>
                 <th className={`sortable-th ${selectedCol === 'gender' ? 'col-header-selected' : ''}`} onClick={() => handleSort('gender')}>
-                  Gender {sortField === 'gender' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                  Gender {sortField === 'gender' ? (sortDirection === 'asc' ? '^' : 'v') : ''}
                 </th>
                 <th className={`sortable-th ${selectedCol === 'attendance' ? 'col-header-selected' : ''}`} onClick={() => handleSort('attendance')}>
-                  Attendance {sortField === 'attendance' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                  Attendance {sortField === 'attendance' ? (sortDirection === 'asc' ? '^' : 'v') : ''}
                 </th>
                 <th className={`sortable-th ${selectedCol === 'guardianName' ? 'col-header-selected' : ''}`} onClick={() => handleSort('guardianName')}>
-                  Guardian {sortField === 'guardianName' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                  Guardian {sortField === 'guardianName' ? (sortDirection === 'asc' ? '^' : 'v') : ''}
                 </th>
                 <th className={selectedCol === 'contact' ? 'col-header-selected' : ''}>
                   Contact

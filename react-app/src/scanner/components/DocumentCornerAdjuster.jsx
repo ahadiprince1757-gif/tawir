@@ -261,11 +261,11 @@ export default function DocumentCornerAdjuster({
       <div className="document-adjuster__status">
         {validation.valid ? (
           <p style={{ color: '#16a36a', margin: 0, fontWeight: 600 }}>
-            ✓ All four document corners are valid.
+            All four document corners are valid.
           </p>
         ) : (
           <p role="alert" style={{ color: '#dc2626', margin: 0, fontWeight: 600 }}>
-            ⚠ {validation.reason}
+            {validation.reason}
           </p>
         )}
       </div>

@@ -96,7 +96,7 @@ export default function LandscapeResultSheetModal({
                 border: 'none',
               }}
             >
-              <span>🖨️ Print / Save Landscape PDF</span>
+              <span>Print / Save Landscape PDF</span>
             </button>
             <span style={{ fontSize: 12, color: 'var(--muted)' }}>
               A4 Landscape • Ready for official records

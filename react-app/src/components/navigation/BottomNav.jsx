@@ -60,7 +60,7 @@ export default function BottomNav({
           type="button"
         >
           <span className="bottom-nav-icon">
-            <span style={{ fontSize: 18, lineHeight: 1 }}>📋</span>
+            <FileTextIcon size={20} />
           </span>
           <span className="bottom-nav-label">Records</span>
         </button>

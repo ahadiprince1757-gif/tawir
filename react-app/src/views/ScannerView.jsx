@@ -373,7 +373,7 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
                     color: isExamDoc ? '#1565c0' : '#2e7d32',
                     border: '1px solid var(--line)', fontWeight: 600,
                   }}>
-                    {isExamDoc ? '📊 Exam Marksheet' : '📋 Attendance Register'}
+                    {isExamDoc ? 'Exam Marksheet' : 'Attendance Register'}
                     {classification.confidence > 0 ? ` (${Math.round(classification.confidence * 100)}%)` : ''}
                   </span>
                 )}
@@ -408,7 +408,7 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
           {/* DRE snippet hint */}
           {isDREResult && (
             <div style={{ padding: '9px 20px', background: '#f0f7ff', borderBottom: '1px solid #cce0ff', fontSize: 12, color: '#1565c0' }}>
-              💡 <strong>How to confirm:</strong> Look at the handwriting image above each name field. Type what you read. Leave blank to skip that row.
+              <strong>How to confirm:</strong> Look at the handwriting image above each name field. Type what you read. Leave blank to skip that row.
             </div>
           )}
 
@@ -443,7 +443,7 @@ export default function ScannerView({ existingLearners, onImportLearners, onToas
                       <th style={{ width: 90 }}>Gender</th>
                     </>
                   )}
-                  <th style={{ width: 36, textAlign: 'center' }}>✕</th>
+                  <th style={{ width: 36, textAlign: 'center' }}>Del</th>
                 </tr>
               </thead>
               <tbody>

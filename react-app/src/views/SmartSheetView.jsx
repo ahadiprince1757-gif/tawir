@@ -448,7 +448,7 @@ export default function SmartSheetView({
               cursor: rawText.trim() ? 'pointer' : 'not-allowed',
             }}
           >
-            {isParsing ? 'Structuring…' : 'Parse & Structure Table ➔'}
+            {isParsing ? 'Structuring…' : 'Parse & Structure Table'}
           </button>
         </div>
       </div>
@@ -480,7 +480,7 @@ export default function SmartSheetView({
                     color: '#7d5a00',
                   }}
                 >
-                  ⚠ {parsedState.stats.warningCount} {parsedState.stats.warningCount === 1 ? 'warning' : 'warnings'} detected
+                  {parsedState.stats.warningCount} {parsedState.stats.warningCount === 1 ? 'warning' : 'warnings'} detected
                 </span>
               )}
               <button
@@ -542,7 +542,7 @@ export default function SmartSheetView({
                       <td>
                         {row.matchedLearner ? (
                           <span style={{ fontSize: 11, color: 'var(--good)', fontWeight: 600 }}>
-                            ✓ {row.matchedLearner.fullName.split(' ')[0]}
+                            {row.matchedLearner.fullName.split(' ')[0]}
                           </span>
                         ) : (
                           <span style={{ fontSize: 11, color: 'var(--muted)' }}>
@@ -595,7 +595,7 @@ export default function SmartSheetView({
                                   lineHeight: 1.2,
                                 }}
                               >
-                                ⚠ {cellWarning.message}
+                                {cellWarning.message}
                               </div>
                             )}
                           </td>
@@ -655,7 +655,7 @@ export default function SmartSheetView({
                 boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
               }}
             >
-              Confirm & Commit to School Operating Memory ➔
+              Confirm & Commit to School Operating Memory
             </button>
           </div>
         </div>

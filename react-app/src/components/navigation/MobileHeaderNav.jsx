@@ -52,7 +52,7 @@ export default function MobileHeaderNav({
               title="Tap to switch class, school or view account"
             >
               <span className="mobile-scope-icon">
-                {isPlatformAdmin ? '⚙️' : isHeadteacher ? '🏫' : '📚'}
+                {isPlatformAdmin ? 'A' : isHeadteacher ? 'H' : 'T'}
               </span>
               <span className="mobile-scope-text">{contextTitle}</span>
               <span className="mobile-scope-arrow">▾</span>
@@ -86,7 +86,7 @@ export default function MobileHeaderNav({
             <div className="mobile-sheet-profile">
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div className="mobile-profile-avatar">
-                  {isPlatformAdmin ? '⚙️' : isHeadteacher ? '🏫' : '👤'}
+                  {isPlatformAdmin ? 'A' : isHeadteacher ? 'H' : 'T'}
                 </div>
                 <div>
                   <div className="mobile-profile-name">{currentUser?.name}</div>
@@ -148,7 +148,7 @@ export default function MobileHeaderNav({
                   onNavigate('today');
                 }}
               >
-                <span>📅 {isTeacher ? 'My Class Workbench' : 'School Overview'}</span>
+                <span>{isTeacher ? 'My Class Workbench' : 'School Overview'}</span>
                 <span className="mobile-action-chevron">›</span>
               </button>
 
@@ -159,7 +159,7 @@ export default function MobileHeaderNav({
                   onNavigate('learners');
                 }}
               >
-                <span>👥 Learners Directory</span>
+                <span>Learners Directory</span>
                 <span className="mobile-action-chevron">›</span>
               </button>
 
@@ -172,7 +172,7 @@ export default function MobileHeaderNav({
                     onNavigate('smartsheet');
                   }}
                 >
-                  <span>📋 Smart Sheet (Bulk Ingestion)</span>
+                  <span>Smart Sheet (Bulk Ingestion)</span>
                   <span className="mobile-action-chevron">›</span>
                 </button>
               )}
@@ -185,7 +185,7 @@ export default function MobileHeaderNav({
                     onNavigate('timeline');
                   }}
                 >
-                  <span>📜 Event Timeline & Audit</span>
+                  <span>Event Timeline & Audit</span>
                   <span className="mobile-action-chevron">›</span>
                 </button>
               )}

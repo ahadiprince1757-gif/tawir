@@ -181,16 +181,16 @@ export default function EventTimelineView({
                   />
                 </th>
                 <th className="sortable-th" onClick={() => handleSort('createdAt')}>
-                  Date & Time {sortField === 'createdAt' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                  Date & Time {sortField === 'createdAt' ? (sortDirection === 'asc' ? '^' : 'v') : ''}
                 </th>
                 <th className="sortable-th" onClick={() => handleSort('type')}>
-                  Type {sortField === 'type' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                  Type {sortField === 'type' ? (sortDirection === 'asc' ? '^' : 'v') : ''}
                 </th>
                 <th className="sortable-th" onClick={() => handleSort('learner')}>
-                  Learner Involved {sortField === 'learner' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                  Learner Involved {sortField === 'learner' ? (sortDirection === 'asc' ? '^' : 'v') : ''}
                 </th>
                 <th className="sortable-th" onClick={() => handleSort('class')}>
-                  Class {sortField === 'class' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                  Class {sortField === 'class' ? (sortDirection === 'asc' ? '^' : 'v') : ''}
                 </th>
                 <th>Recorded Event & Details</th>
                 <th style={{ width: '44px', textAlign: 'center' }}>Erase</th>
