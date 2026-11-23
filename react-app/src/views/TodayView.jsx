@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import AddRecordModal from '../components/AddRecordModal.jsx';
 import AddLearnerModal from '../components/AddLearnerModal.jsx';
 import LandscapeResultSheetModal from '../components/LandscapeResultSheetModal.jsx';
+import MarksEntrySheet from '../components/MarksEntrySheet.jsx';
 import { runSchoolIntelligenceEngine } from '../features/school-intelligence/index.js';
 import { todayDateKey, todayDateLabel, timeLabel } from '../utils/formatters.js';
 
@@ -15,6 +16,7 @@ export default function TodayView({
   classAssignments,
   onSelectClass,
   onCommitEvent,
+  onCommitEvents,
   onToggleAttendance,
   onSelectLearner,
   onAddLearner,
@@ -24,10 +26,14 @@ export default function TodayView({
   const isTeacher = currentUser?.role === 'teacher';
   const todayKey = todayDateKey();
 
+  // Workbench Mode: 'attendance' | 'marks'
+  const [teacherMode, setTeacherMode] = useState('attendance');
+
   // Modal State
   const [isAddRecordOpen, setIsAddRecordOpen] = useState(false);
   const [isAddLearnerOpen, setIsAddLearnerOpen] = useState(false);
   const [isLandscapeSheetOpen, setIsLandscapeSheetOpen] = useState(false);
+  const [isMarksSheetModalOpen, setIsMarksSheetModalOpen] = useState(false);
   const [recordInitialType, setRecordInitialType] = useState('observation');
 
   // Filtering & Search State
@@ -127,65 +133,100 @@ export default function TodayView({
           <button onClick={() => setIsAddLearnerOpen(true)} className="ribbon-btn">
             Add Learner
           </button>
-          <button onClick={() => handleOpenAddRecord('assessment')} className="ribbon-btn">
-            Enter Scores
+          <button
+            onClick={() => setTeacherMode(teacherMode === 'marks' ? 'attendance' : 'marks')}
+            className={`ribbon-btn ${teacherMode === 'marks' ? 'active' : ''}`}
+          >
+            {teacherMode === 'marks' ? 'Daily Register' : 'Enter Marks'}
           </button>
           <button onClick={() => handleOpenAddRecord('observation')} className="ribbon-btn">
             Add Note
           </button>
         </div>
 
-        {/* ── Direct Attendance Class Roster (Zero Horizontal Scroll) ──────────── */}
-        <div className="teacher-roster-panel">
-          <div className="roster-search-head">
-            <input
-              type="text"
-              placeholder="Search learner in class..."
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-              className="roster-search-input"
-            />
-          </div>
-
-          <div className="teacher-learner-list">
-            {filteredClassLearners.map((learner) => {
-              const isAbsent = dailyBriefing.absentLearnerIds.includes(learner.id);
-              return (
-                <div
-                  key={learner.id}
-                  className={`teacher-learner-card ${isAbsent ? 'learner-absent' : 'learner-present'}`}
-                  onClick={() => onSelectLearner(learner.id)}
-                  title="Tap to view complete learner dossier"
-                >
-                  <div className="learner-info-col">
-                    <div className="learner-card-name">
-                      <strong>{learner.fullName}</strong>
-                      {learner.admissionNumber && (
-                        <span className="learner-adm-badge">#{learner.admissionNumber}</span>
-                      )}
-                    </div>
-                    <div className="learner-card-sub">
-                      Tap name for dossier & evidence
-                    </div>
-                  </div>
-
-                  {/* Dedicated 44px Direct Attendance Toggle Button */}
-                  <button
-                    type="button"
-                    className={`btn-attendance-toggle ${isAbsent ? 'btn-absent' : 'btn-present'}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleAttendance(todayKey, learner.id);
-                    }}
-                    title={isAbsent ? 'Tap to mark Present' : 'Tap to mark Absent'}
-                  >
-                    {isAbsent ? 'ABSENT' : 'PRESENT'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+        {/* ── Workbench Mode Switcher: Daily Register vs Enter Marks Sheet ── */}
+        <div className="workbench-mode-switcher">
+          <button
+            type="button"
+            className={`mode-tab-btn ${teacherMode === 'attendance' ? 'active' : ''}`}
+            onClick={() => setTeacherMode('attendance')}
+          >
+            Attendance Register
+          </button>
+          <button
+            type="button"
+            className={`mode-tab-btn ${teacherMode === 'marks' ? 'active' : ''}`}
+            onClick={() => setTeacherMode('marks')}
+          >
+            Marks Entry Sheet
+          </button>
         </div>
+
+        {teacherMode === 'marks' ? (
+          <MarksEntrySheet
+            learners={learners}
+            events={events}
+            currentUser={currentUser}
+            activeSchool={activeSchool}
+            activeClass={activeClass}
+            onCommitEvents={onCommitEvents}
+            onCommitEvent={onCommitEvent}
+            onToast={onToast}
+            onClose={() => setTeacherMode('attendance')}
+          />
+        ) : (
+          /* ── Direct Attendance Class Roster (Zero Horizontal Scroll) ──────────── */
+          <div className="teacher-roster-panel">
+            <div className="roster-search-head">
+              <input
+                type="text"
+                placeholder="Search learner in class..."
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                className="roster-search-input"
+              />
+            </div>
+
+            <div className="teacher-learner-list">
+              {filteredClassLearners.map((learner) => {
+                const isAbsent = dailyBriefing.absentLearnerIds.includes(learner.id);
+                return (
+                  <div
+                    key={learner.id}
+                    className={`teacher-learner-card ${isAbsent ? 'learner-absent' : 'learner-present'}`}
+                    onClick={() => onSelectLearner(learner.id)}
+                    title="Tap to view complete learner dossier"
+                  >
+                    <div className="learner-info-col">
+                      <div className="learner-card-name">
+                        <strong>{learner.fullName}</strong>
+                        {learner.admissionNumber && (
+                          <span className="learner-adm-badge">#{learner.admissionNumber}</span>
+                        )}
+                      </div>
+                      <div className="learner-card-sub">
+                        Tap name for dossier & evidence
+                      </div>
+                    </div>
+
+                    {/* Dedicated 44px Direct Attendance Toggle Button */}
+                    <button
+                      type="button"
+                      className={`btn-attendance-toggle ${isAbsent ? 'btn-absent' : 'btn-present'}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleAttendance(todayKey, learner.id);
+                      }}
+                      title={isAbsent ? 'Tap to mark Present' : 'Tap to mark Absent'}
+                    >
+                      {isAbsent ? 'ABSENT' : 'PRESENT'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Modals */}
         <AddRecordModal
@@ -238,13 +279,22 @@ export default function TodayView({
             {activeSchool?.name || "St. Mary's School"} • {todayDateLabel()}
           </div>
         </div>
-        <button
-          onClick={() => setIsLandscapeSheetOpen(true)}
-          className="btn-sheet-trigger"
-          title="View & Print Official Landscape Result Sheet"
-        >
-          Result Sheet
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button
+            onClick={() => setIsMarksSheetModalOpen(true)}
+            className="btn-sheet-trigger"
+            title="Open Class Marks Entry Sheet"
+          >
+            Enter Marks
+          </button>
+          <button
+            onClick={() => setIsLandscapeSheetOpen(true)}
+            className="btn-sheet-trigger"
+            title="View & Print Official Landscape Result Sheet"
+          >
+            Result Sheet
+          </button>
+        </div>
       </div>
 
       {/* ── 1. School Pulse (Grounded in Verified Records) ────────────────────── */}
@@ -501,6 +551,29 @@ export default function TodayView({
         activeSchool={activeSchool}
         activeClass={activeClass}
       />
+
+      {/* Class Marks Entry Sheet Modal (Headteacher / Platform Admin) */}
+      {isMarksSheetModalOpen && (
+        <div className="modal-backdrop" onClick={() => setIsMarksSheetModalOpen(false)}>
+          <div
+            className="modal modal-sheet modal-result-sheet-container"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 840, padding: 0, overflow: 'hidden' }}
+          >
+            <MarksEntrySheet
+              learners={learners}
+              events={events}
+              currentUser={currentUser}
+              activeSchool={activeSchool}
+              activeClass={activeClass}
+              onCommitEvents={onCommitEvents}
+              onCommitEvent={onCommitEvent}
+              onToast={onToast}
+              onClose={() => setIsMarksSheetModalOpen(false)}
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 }

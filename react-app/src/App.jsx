@@ -172,6 +172,18 @@ export default function App() {
     }
   };
 
+  const handleCommitEvents = async (newEvents) => {
+    if (!newEvents || newEvents.length === 0) return;
+    const stamped = newEvents.map((ev) => ({ ...ownershipFields, ...ev }));
+    setEvents((prev) => [...stamped, ...prev]);
+    try {
+      await api.createEventsBatch(stamped);
+      setBackendConnected(true);
+    } catch (err) {
+      console.warn('Events saved locally:', err.message);
+    }
+  };
+
   const handleToggleAttendance = async (dateKey, learnerId) => {
     const existingIndex = events.findIndex(
       (e) => e.type === 'attendance' && e.action === 'absent' && e.learnerId === learnerId && e.date === dateKey
@@ -436,6 +448,7 @@ export default function App() {
             classAssignments={classAssignments}
             onSelectClass={setActiveClassId}
             onCommitEvent={handleCommitEvent}
+            onCommitEvents={handleCommitEvents}
             onToggleAttendance={handleToggleAttendance}
             onSelectLearner={(id) => setSelectedLearnerId(id)}
             onAddLearner={handleAddLearner}

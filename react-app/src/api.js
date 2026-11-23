@@ -250,6 +250,19 @@ export const api = {
     });
   },
 
+  createEventsBatch: async (events) => {
+    if (isSupabaseConfigured()) {
+      const payloads = events.map(toDbEvent);
+      const { data, error } = await supabase.from('events').insert(payloads).select();
+      if (error) throw error;
+      return (data || []).map(fromDbEvent);
+    }
+    return request('/events/batch', {
+      method: 'POST',
+      body: JSON.stringify({ events }),
+    });
+  },
+
   deleteEvent: async (eventId) => {
     if (isSupabaseConfigured()) {
       const { error } = await supabase.from('events').delete().eq('id', eventId);

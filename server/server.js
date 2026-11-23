@@ -274,6 +274,33 @@ app.post('/api/events', (req, res) => {
   res.status(201).json(event);
 });
 
+// Batch create events (used for fluent class-wide marks entry)
+app.post('/api/events/batch', (req, res) => {
+  const { events } = req.body;
+  if (!Array.isArray(events)) return res.status(400).json({ error: 'events array required' });
+  const db = readDb();
+  const createdEvents = events.map(ev => ({
+    id: ev.id || `ev_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    type: ev.type || 'assessment',
+    action: ev.action || 'score',
+    learnerId: ev.learnerId || null,
+    className: ev.className || null,
+    classId: ev.classId || null,
+    date: ev.date || new Date().toISOString().split('T')[0],
+    value: ev.value || null,
+    metadata: ev.metadata || {},
+    source: ev.source || '',
+    createdByUserId: ev.createdByUserId || null,
+    createdByName: ev.createdByName || null,
+    createdByRole: ev.createdByRole || null,
+    createdAt: ev.createdAt || new Date().toISOString()
+  }));
+
+  db.events = [...createdEvents, ...(db.events || [])];
+  writeDb(db);
+  res.status(201).json({ success: true, count: createdEvents.length, events: createdEvents });
+});
+
 // Delete a single event
 app.delete('/api/events/:id', (req, res) => {
   const { id } = req.params;
