@@ -29,6 +29,8 @@ export default function MarksEntrySheet({
     return CANONICAL_SUBJECTS.find(s => s.code === selectedSubjectCode) || CANONICAL_SUBJECTS[0];
   }, [selectedSubjectCode]);
 
+  const classNameLabel = currentUser?.className || activeClass?.name || activeClass?.className || 'Class';
+
   // Pre-fill existing scores for the selected subject from events
   useEffect(() => {
     const prefilled = {};
@@ -182,128 +184,154 @@ export default function MarksEntrySheet({
   };
 
   return (
-    <div className="marks-sheet-container">
-      {/* ── Top Header Strip: Subject Selector & Actions ── */}
-      <div className="marks-sheet-header">
-        <div>
-          <div className="marks-sheet-sublabel">
-            Class Assessment Marks Sheet • {currentUser?.className || activeClass?.name || 'My Class'}
+    <div className="marks-sheet-fullscreen">
+      {/* ── 1. Top Fullscreen Header ── */}
+      <header className="marks-fullscreen-header">
+        <div className="marks-fullscreen-left">
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="marks-back-button"
+              title="Return to workbench"
+            >
+              &larr; Back
+            </button>
+          )}
+          <div className="marks-fullscreen-heading">
+            <h1 className="marks-fullscreen-subject-name">{activeSubject.name}</h1>
+            <div className="marks-fullscreen-subtext">
+              {classNameLabel} &bull; Marks Entry Sheet
+            </div>
           </div>
-          <h2 className="marks-sheet-title">{activeSubject.name}</h2>
         </div>
-        {onClose && (
-          <button onClick={onClose} className="btn-close-compact" title="Close marks sheet">
-            x
-          </button>
-        )}
-      </div>
 
-      {/* ── Subject Horizontal Pill Bar ── */}
-      <div className="marks-subject-bar">
+        <div className="marks-fullscreen-right">
+          <div className="marks-fullscreen-quick-stats">
+            <strong>{stats.enteredCount}</strong> / {stats.totalCount} Entered
+            {stats.averagePct !== null && ` &bull; Mean: ${stats.averagePct}%`}
+          </div>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn-sheet-trigger"
+            >
+              Done
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* ── 2. Subject Horizontal Pill Bar (Spans 100% width) ── */}
+      <nav className="marks-fullscreen-subject-bar" aria-label="Select Subject">
         {CANONICAL_SUBJECTS.map(subj => {
           const isSelected = subj.code === selectedSubjectCode;
           return (
             <button
               key={subj.code}
               type="button"
-              className={`marks-subject-pill ${isSelected ? 'active' : ''}`}
+              className={`marks-fullscreen-subject-tab ${isSelected ? 'active' : ''}`}
               onClick={() => setSelectedSubjectCode(subj.code)}
             >
               {subj.name}
             </button>
           );
         })}
-      </div>
+      </nav>
 
-      {/* ── Assessment Configuration Controls ── */}
-      <div className="marks-config-panel">
-        <div className="marks-config-group">
-          <label className="marks-config-label">Assessment Title</label>
+      {/* ── 3. Configuration & Search Bar (Edge-to-Edge) ── */}
+      <div className="marks-fullscreen-config-bar">
+        <div className="config-item config-topic">
+          <label className="config-label">Topic / Assessment</label>
           <input
             type="text"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            placeholder="e.g. End Term Exam, Unit 2 Test"
-            className="marks-config-input"
+            placeholder="e.g. End Term Exam, Mid Term, Quiz 1"
+            className="config-input-text"
           />
         </div>
 
-        <div className="marks-config-group" style={{ maxWidth: 160 }}>
-          <label className="marks-config-label">Max Score (Out of)</label>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <div className="config-item config-outof">
+          <label className="config-label">Max Score (Out of)</label>
+          <div className="config-outof-chips">
             <input
               type="number"
               min="1"
               value={outOf}
               onChange={(e) => setOutOf(Number(e.target.value) || 100)}
-              className="marks-config-input"
-              style={{ width: 70, textAlign: 'center' }}
+              className="config-input-number"
             />
-            <div style={{ display: 'flex', gap: 4 }}>
-              {[100, 50, 30].map(val => (
-                <button
-                  key={val}
-                  type="button"
-                  className={`marks-chip-btn ${outOf === val ? 'active' : ''}`}
-                  onClick={() => setOutOf(val)}
-                >
-                  {val}
-                </button>
-              ))}
-            </div>
+            {[100, 50, 40, 30, 20].map(val => (
+              <button
+                key={val}
+                type="button"
+                className={`config-chip ${outOf === val ? 'active' : ''}`}
+                onClick={() => setOutOf(val)}
+              >
+                {val}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="marks-config-group" style={{ maxWidth: 150 }}>
-          <label className="marks-config-label">Assessment Date</label>
+        <div className="config-item config-date">
+          <label className="config-label">Date</label>
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="marks-config-input"
+            className="config-input-date"
+          />
+        </div>
+
+        <div className="config-item config-search">
+          <label className="config-label">Filter Roster</label>
+          <input
+            type="text"
+            placeholder="Search student or admission #..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="config-input-search"
           />
         </div>
       </div>
 
-      {/* ── Search Bar & Roster Counter ── */}
-      <div className="marks-roster-head">
-        <input
-          type="text"
-          placeholder="Filter learner by name or admission number..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="roster-search-input"
-        />
-      </div>
+      {/* ── 4. Fullscreen Scrollable Class Sheet Roster ── */}
+      <main className="marks-fullscreen-roster-body">
+        <div className="marks-fullscreen-roster-header-row">
+          <div className="col-student">Learner Name</div>
+          <div className="col-score">Score / {outOf}</div>
+          <div className="col-level">Performance Level</div>
+        </div>
 
-      {/* ── Class Marks Roster (Sheet layout matching Register) ── */}
-      <div className="marks-roster-list">
-        {filteredLearners.length > 0 ? (
-          filteredLearners.map((learner, idx) => {
-            const rawScore = scores[learner.id];
-            const hasValue = rawScore !== undefined && rawScore !== null && String(rawScore).trim() !== '';
-            const numScore = hasValue ? Number(rawScore) : null;
-            const percentage = numScore !== null && !isNaN(numScore) && outOf > 0
-              ? Math.round((numScore / outOf) * 100)
-              : null;
-            const grade = percentage !== null ? resolveGrade(percentage, GRADING_SYSTEMS.CBC_LEVELS) : null;
-            const isOverMax = numScore !== null && numScore > outOf;
+        <div className="marks-fullscreen-roster-list">
+          {filteredLearners.length > 0 ? (
+            filteredLearners.map((learner, idx) => {
+              const rawScore = scores[learner.id];
+              const hasValue = rawScore !== undefined && rawScore !== null && String(rawScore).trim() !== '';
+              const numScore = hasValue ? Number(rawScore) : null;
+              const percentage = numScore !== null && !isNaN(numScore) && outOf > 0
+                ? Math.round((numScore / outOf) * 100)
+                : null;
+              const grade = percentage !== null ? resolveGrade(percentage, GRADING_SYSTEMS.CBC_LEVELS) : null;
+              const isOverMax = numScore !== null && numScore > outOf;
 
-            return (
-              <div key={learner.id} className="marks-learner-row">
-                <div className="marks-learner-left">
-                  <span className="marks-learner-index">#{idx + 1}</span>
-                  <div className="marks-learner-identity">
-                    <strong className="marks-learner-name">{learner.fullName}</strong>
-                    <span className="marks-learner-meta">
-                      {learner.admissionNumber ? `Adm: #${learner.admissionNumber}` : ''}
-                      {learner.gender ? ` • ${learner.gender}` : ''}
-                    </span>
+              return (
+                <div key={learner.id} className="marks-fullscreen-row">
+                  <div className="row-student-info">
+                    <span className="row-index">#{idx + 1}</span>
+                    <div className="row-name-block">
+                      <strong className="row-fullname">{learner.fullName}</strong>
+                      <span className="row-admission-meta">
+                        {learner.admissionNumber ? `Adm #${learner.admissionNumber}` : ''}
+                        {learner.gender ? ` &bull; ${learner.gender}` : ''}
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                <div className="marks-input-wrapper">
-                  <div className="marks-score-container">
+                  <div className="row-score-input-block">
                     <input
                       ref={el => inputRefs.current[learner.id] = el}
                       type="number"
@@ -315,12 +343,12 @@ export default function MarksEntrySheet({
                       value={scores[learner.id] ?? ''}
                       onChange={(e) => handleScoreChange(learner.id, e.target.value)}
                       onKeyDown={(e) => handleKeyDown(e, idx)}
-                      className={`marks-score-input ${isOverMax ? 'input-error' : ''} ${hasValue ? 'input-filled' : ''}`}
+                      className={`fullscreen-score-input ${isOverMax ? 'input-error' : ''} ${hasValue ? 'input-filled' : ''}`}
                     />
-                    <span className="marks-outof-label">/ {outOf}</span>
+                    <span className="fullscreen-outof-suffix">/ {outOf}</span>
                   </div>
 
-                  <div className="marks-badge-container">
+                  <div className="row-grade-block">
                     {isOverMax ? (
                       <span className="tag alert" style={{ fontSize: 11 }}>Exceeds {outOf}</span>
                     ) : grade && percentage !== null ? (
@@ -332,47 +360,51 @@ export default function MarksEntrySheet({
                     )}
                   </div>
                 </div>
-              </div>
-            );
-          })
-        ) : (
-          <div className="empty" style={{ padding: 24, textAlign: 'center' }}>
-            No learners matching "{searchQuery}".
-          </div>
-        )}
-      </div>
+              );
+            })
+          ) : (
+            <div className="empty" style={{ padding: 40, textAlign: 'center' }}>
+              No learners matching "{searchQuery}".
+            </div>
+          )}
+        </div>
+      </main>
 
-      {/* ── Sticky Save & Statistics Action Bar ── */}
-      <div className="marks-save-bar">
-        <div className="marks-summary-stats">
-          <div className="stat-highlight">
-            <strong>{stats.enteredCount}</strong> / {stats.totalCount} scores entered
+      {/* ── 5. Sticky Bottom Action Bar (Full Screen Width) ── */}
+      <footer className="marks-fullscreen-footer">
+        <div className="footer-summary-left">
+          <div className="footer-primary-stat">
+            <strong>{stats.enteredCount}</strong> of <strong>{stats.totalCount}</strong> marks recorded
           </div>
           {stats.averagePct !== null && (
-            <div className="stat-sub">
-              Average: <strong>{stats.average} / {outOf} ({stats.averagePct}%)</strong>
-              {stats.highest !== null && ` • High: ${stats.highest}`}
-              {stats.lowest !== null && ` • Low: ${stats.lowest}`}
+            <div className="footer-secondary-stat">
+              Class Average: <strong>{stats.average} / {outOf} ({stats.averagePct}%)</strong>
+              {stats.highest !== null && ` &bull; Highest: ${stats.highest}`}
+              {stats.lowest !== null && ` &bull; Lowest: ${stats.lowest}`}
             </div>
           )}
         </div>
 
-        <div className="marks-save-actions">
+        <div className="footer-actions-right">
           {onClose && (
-            <button type="button" onClick={onClose} className="btn-sheet-trigger">
-              Cancel
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn-sheet-trigger"
+            >
+              Close
             </button>
           )}
           <button
             type="button"
             onClick={handleSaveAll}
-            className="btn-marks-save"
+            className="btn-marks-save-large"
             disabled={stats.enteredCount === 0}
           >
-            {isSaved ? 'Marks Saved' : `Save ${stats.enteredCount > 0 ? stats.enteredCount : ''} Marks`}
+            {isSaved ? 'All Marks Saved' : `Save ${stats.enteredCount > 0 ? stats.enteredCount : ''} Marks`}
           </button>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }

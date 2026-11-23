@@ -2700,7 +2700,7 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   4. Fluent Marks Entry Sheet Components
+   4. Fullscreen Marks Entry Sheet (Edge-to-Edge Desktop & Mobile)
    ═══════════════════════════════════════════════════════════════════════════ */
 .workbench-mode-switcher {
   display: flex;
@@ -2731,259 +2731,386 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.marks-sheet-container {
-  background: var(--surface);
-  border: 1.5px solid var(--border);
-  border-radius: 14px;
+/* Fullscreen Root Container: completely covers viewport */
+.marks-sheet-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background: var(--bg, #f8f9fa);
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  box-sizing: border-box;
 }
 
-.marks-sheet-header {
-  padding: 16px 18px 12px;
+/* Fullscreen Top Header */
+.marks-fullscreen-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  border-bottom: 1px solid var(--line);
-  background: var(--bg);
+  align-items: center;
+  padding: 14px 20px;
+  background: var(--surface, #ffffff);
+  border-bottom: 1.5px solid var(--border, #e5e7eb);
+  flex-shrink: 0;
 }
 
-.marks-sheet-sublabel {
-  font-size: 11px;
+.marks-fullscreen-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.marks-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border, #e5e7eb);
+  background: var(--surface, #ffffff);
+  color: var(--ink, #0f172a);
+  font-size: 13px;
   font-weight: 750;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.marks-sheet-title {
-  margin: 4px 0 0;
+.marks-back-button:hover {
+  background: var(--soft, #f1f5f9);
+  border-color: var(--ink, #0f172a);
+}
+
+.marks-fullscreen-heading {
+  display: flex;
+  flex-direction: column;
+}
+
+.marks-fullscreen-subject-name {
+  margin: 0;
   font-size: 20px;
   font-weight: 850;
-  color: var(--ink);
+  color: var(--ink, #0f172a);
   letter-spacing: -0.02em;
 }
 
-/* Horizontal Subject Selector */
-.marks-subject-bar {
+.marks-fullscreen-subtext {
+  font-size: 12px;
+  color: var(--muted, #64748b);
+  margin-top: 1px;
+}
+
+.marks-fullscreen-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.marks-fullscreen-quick-stats {
+  font-size: 13px;
+  color: var(--muted, #64748b);
+}
+
+.marks-fullscreen-quick-stats strong {
+  color: var(--ink, #0f172a);
+}
+
+/* Horizontal Fullscreen Subject Tabs (100% width) */
+.marks-fullscreen-subject-bar {
   display: flex;
   gap: 8px;
-  padding: 12px 14px;
+  padding: 10px 20px;
+  background: var(--surface, #ffffff);
+  border-bottom: 1px solid var(--line, #e2e8f0);
   overflow-x: auto;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface);
+  flex-shrink: 0;
   -webkit-overflow-scrolling: touch;
 }
 
-.marks-subject-bar::-webkit-scrollbar {
+.marks-fullscreen-subject-bar::-webkit-scrollbar {
   height: 4px;
 }
 
-.marks-subject-bar::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
-}
-
-.marks-subject-pill {
-  padding: 8px 14px;
+.marks-fullscreen-subject-tab {
+  padding: 8px 16px;
   border-radius: 20px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--ink);
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--bg, #f8f9fa);
+  color: var(--ink, #0f172a);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 750;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
   font-family: inherit;
 }
 
-.marks-subject-pill:hover {
-  background: var(--soft);
-  border-color: var(--ink);
+.marks-fullscreen-subject-tab:hover {
+  background: var(--soft, #f1f5f9);
 }
 
-.marks-subject-pill.active {
-  background: var(--ink);
+.marks-fullscreen-subject-tab.active {
+  background: var(--ink, #0f172a);
   color: #ffffff;
-  border-color: var(--ink);
+  border-color: var(--ink, #0f172a);
 }
 
-/* Configuration Row */
-.marks-config-panel {
+/* Configuration & Search Bar */
+.marks-fullscreen-config-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 12px 14px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--line);
+  gap: 14px;
+  padding: 12px 20px;
+  background: var(--bg, #f8f9fa);
+  border-bottom: 1.5px solid var(--border, #e5e7eb);
+  align-items: flex-end;
+  flex-shrink: 0;
 }
 
-.marks-config-group {
-  flex: 1;
-  min-width: 140px;
+.config-item {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.marks-config-label {
-  font-size: 11px;
-  font-weight: 750;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+.config-topic {
+  flex: 1.5;
+  min-width: 180px;
 }
 
-.marks-config-input {
-  padding: 8px 10px;
-  border-radius: 7px;
-  border: 1.5px solid var(--border);
+.config-outof {
+  min-width: 220px;
+}
+
+.config-date {
+  min-width: 140px;
+}
+
+.config-search {
+  flex: 1.5;
+  min-width: 200px;
+}
+
+.config-label {
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted, #64748b);
+}
+
+.config-input-text,
+.config-input-date,
+.config-input-search {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border, #e2e8f0);
   background: #ffffff;
-  color: var(--ink);
+  color: var(--ink, #0f172a);
   font-size: 13px;
   font-family: inherit;
   outline: none;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.marks-config-input:focus {
-  border-color: var(--ink);
+.config-input-text:focus,
+.config-input-date:focus,
+.config-input-search:focus {
+  border-color: var(--ink, #0f172a);
 }
 
-.marks-chip-btn {
-  padding: 6px 8px;
+.config-outof-chips {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.config-input-number {
+  width: 65px;
+  padding: 8px 8px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 800;
+  border-radius: 8px;
+  border: 1.5px solid var(--border, #e2e8f0);
+  background: #ffffff;
+  color: var(--ink, #0f172a);
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.config-input-number:focus {
+  border-color: var(--ink, #0f172a);
+}
+
+.config-chip {
+  padding: 6px 10px;
   border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  font-size: 11px;
-  font-weight: 700;
+  border: 1px solid var(--border, #e2e8f0);
+  background: #ffffff;
+  color: var(--ink, #0f172a);
+  font-size: 12px;
+  font-weight: 750;
   cursor: pointer;
-  color: var(--ink);
+  transition: all 0.12s ease;
 }
 
-.marks-chip-btn.active {
-  background: var(--ink);
+.config-chip.active {
+  background: var(--ink, #0f172a);
   color: #ffffff;
-  border-color: var(--ink);
+  border-color: var(--ink, #0f172a);
 }
 
-.marks-roster-head {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface);
+/* Fullscreen Scrollable Body */
+.marks-fullscreen-roster-body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface, #ffffff);
 }
 
-.marks-roster-list {
+.marks-fullscreen-roster-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: var(--bg, #f8f9fa);
+  border-bottom: 1.5px solid var(--border, #e5e7eb);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted, #64748b);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.marks-fullscreen-roster-header-row .col-student {
+  flex: 1;
+}
+
+.marks-fullscreen-roster-header-row .col-score {
+  width: 130px;
+  text-align: center;
+}
+
+.marks-fullscreen-roster-header-row .col-level {
+  width: 140px;
+  text-align: right;
+}
+
+.marks-fullscreen-roster-list {
   display: flex;
   flex-direction: column;
 }
 
-.marks-learner-row {
+.marks-fullscreen-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--line);
-  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line, #f1f5f9);
   transition: background 0.1s ease;
 }
 
-.marks-learner-row:last-child {
-  border-bottom: none;
+.marks-fullscreen-row:hover {
+  background: #f8fafc;
 }
 
-.marks-learner-row:hover {
-  background: #fafafa;
-}
-
-.marks-learner-left {
+.row-student-info {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex: 1;
   min-width: 0;
 }
 
-.marks-learner-index {
-  font-size: 11px;
+.row-index {
+  font-size: 12px;
   font-weight: 750;
-  color: var(--muted);
-  min-width: 24px;
+  color: var(--muted, #94a3b8);
+  min-width: 28px;
 }
 
-.marks-learner-identity {
+.row-name-block {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 
-.marks-learner-name {
-  font-size: 14px;
-  font-weight: 750;
-  color: var(--ink);
+.row-fullname {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink, #0f172a);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.marks-learner-meta {
-  font-size: 11px;
-  color: var(--muted);
+.row-admission-meta {
+  font-size: 12px;
+  color: var(--muted, #64748b);
   margin-top: 1px;
 }
 
-.marks-input-wrapper {
+.row-score-input-block {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  width: 130px;
+  justify-content: center;
 }
 
-.marks-score-container {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.marks-score-input {
-  width: 64px;
-  padding: 8px 6px;
+.fullscreen-score-input {
+  width: 72px;
+  padding: 10px 8px;
   text-align: center;
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 18px;
+  font-weight: 850;
   border-radius: 8px;
-  border: 1.5px solid var(--border);
+  border: 1.5px solid var(--border, #cbd5e1);
   background: #ffffff;
-  color: var(--ink);
+  color: var(--ink, #0f172a);
   outline: none;
   font-family: inherit;
   transition: all 0.15s ease;
+  box-sizing: border-box;
 }
 
-.marks-score-input:focus {
-  border-color: var(--ink);
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+.fullscreen-score-input:focus {
+  border-color: var(--ink, #0f172a);
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.1);
+  background: #ffffff;
 }
 
-.marks-score-input.input-filled {
+.fullscreen-score-input.input-filled {
   background: #f8fafc;
   border-color: #94a3b8;
 }
 
-.marks-score-input.input-error {
+.fullscreen-score-input.input-error {
   border-color: #ef4444;
   background: #fef2f2;
   color: #dc2626;
 }
 
-.marks-outof-label {
-  font-size: 11px;
+.fullscreen-outof-suffix {
+  font-size: 12px;
   font-weight: 600;
-  color: var(--muted);
+  color: var(--muted, #64748b);
   white-space: nowrap;
 }
 
-.marks-badge-container {
-  min-width: 76px;
+.row-grade-block {
+  width: 140px;
   display: flex;
   justify-content: flex-end;
 }
@@ -3017,62 +3144,67 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
 }
 
 .marks-grade-placeholder {
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--muted, #94a3b8);
+  font-size: 13px;
 }
 
-/* Save Bar */
-.marks-save-bar {
+/* Fullscreen Sticky Footer */
+.marks-fullscreen-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 14px 18px;
-  background: var(--bg);
-  border-top: 1.5px solid var(--border);
-  position: sticky;
-  bottom: 0;
+  gap: 14px;
+  padding: 14px 20px;
+  background: var(--surface, #ffffff);
+  border-top: 1.5px solid var(--border, #e5e7eb);
+  flex-shrink: 0;
   z-index: 10;
 }
 
-.marks-summary-stats .stat-highlight {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ink);
+.footer-summary-left {
+  display: flex;
+  flex-direction: column;
 }
 
-.marks-summary-stats .stat-sub {
-  font-size: 11px;
-  color: var(--muted);
+.footer-primary-stat {
+  font-size: 14px;
+  font-weight: 750;
+  color: var(--ink, #0f172a);
+}
+
+.footer-secondary-stat {
+  font-size: 12px;
+  color: var(--muted, #64748b);
   margin-top: 2px;
 }
 
-.marks-save-actions {
+.footer-actions-right {
   display: flex;
-  gap: 8px;
   align-items: center;
+  gap: 10px;
 }
 
-.btn-marks-save {
-  padding: 10px 18px;
-  border-radius: 8px;
+.btn-marks-save-large {
+  padding: 12px 24px;
+  border-radius: 10px;
   border: none;
-  background: var(--ink);
+  background: var(--ink, #0f172a);
   color: #ffffff;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
   cursor: pointer;
   transition: all 0.15s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
-.btn-marks-save:disabled {
-  opacity: 0.5;
+.btn-marks-save-large:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
-.btn-marks-save:not(:disabled):hover {
+.btn-marks-save-large:not(:disabled):hover {
   opacity: 0.92;
   transform: translateY(-1px);
 }

@@ -552,27 +552,19 @@ export default function TodayView({
         activeClass={activeClass}
       />
 
-      {/* Class Marks Entry Sheet Modal (Headteacher / Platform Admin) */}
+      {/* Fullscreen Class Marks Entry Sheet (Headteacher / Platform Admin) */}
       {isMarksSheetModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsMarksSheetModalOpen(false)}>
-          <div
-            className="modal modal-sheet modal-result-sheet-container"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: 840, padding: 0, overflow: 'hidden' }}
-          >
-            <MarksEntrySheet
-              learners={learners}
-              events={events}
-              currentUser={currentUser}
-              activeSchool={activeSchool}
-              activeClass={activeClass}
-              onCommitEvents={onCommitEvents}
-              onCommitEvent={onCommitEvent}
-              onToast={onToast}
-              onClose={() => setIsMarksSheetModalOpen(false)}
-            />
-          </div>
-        </div>
+        <MarksEntrySheet
+          learners={learners}
+          events={events}
+          currentUser={currentUser}
+          activeSchool={activeSchool}
+          activeClass={activeClass}
+          onCommitEvents={onCommitEvents}
+          onCommitEvent={onCommitEvent}
+          onToast={onToast}
+          onClose={() => setIsMarksSheetModalOpen(false)}
+        />
       )}
     </section>
   );
