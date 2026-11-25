@@ -2969,6 +2969,29 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
   border-color: var(--ink, #0f172a);
 }
 
+.marks-custom-outof-input {
+  width: 54px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #cbd5e1);
+  background: #ffffff;
+  color: var(--ink, #0f172a);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+.marks-custom-outof-input::-webkit-outer-spin-button,
+.marks-custom-outof-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.marks-custom-outof-input:focus {
+  outline: none;
+  border-color: var(--ink, #0f172a);
+  box-shadow: 0 0 0 2px rgba(15,23,42,0.08);
+}
+
 .marks-details-toggle-btn {
   padding: 6px 10px;
   border-radius: 6px;

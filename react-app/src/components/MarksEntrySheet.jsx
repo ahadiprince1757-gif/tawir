@@ -16,7 +16,7 @@ export default function MarksEntrySheet({
   onClose,
 }) {
   const [selectedSubjectCode, setSelectedSubjectCode] = useState(CANONICAL_SUBJECTS[0].code);
-  const [outOf, setOutOf] = useState(100);
+  const [outOf, setOutOf] = useState('100');
   const [topic, setTopic] = useState('End Term Assessment');
   const [date, setDate] = useState(() => todayDateKey());
   const [searchQuery, setSearchQuery] = useState('');
@@ -112,7 +112,7 @@ export default function MarksEntrySheet({
     }
 
     const average = count > 0 ? Math.round((totalScore / count) * 10) / 10 : null;
-    const averagePct = count > 0 && outOf > 0 ? Math.round(((totalScore / count) / outOf) * 1000) / 10 : null;
+    const averagePct = count > 0 && Number(outOf) > 0 ? Math.round(((totalScore / count) / Number(outOf)) * 1000) / 10 : null;
 
     return {
       enteredCount: count,
@@ -270,17 +270,31 @@ export default function MarksEntrySheet({
               <button
                 key={val}
                 type="button"
-                className={`marks-quick-chip ${outOf === val ? 'active' : ''}`}
-                onClick={() => setOutOf(val)}
+                className={`marks-quick-chip ${Number(outOf) === val ? 'active' : ''}`}
+                onClick={() => setOutOf(String(val))}
               >
                 {val}
               </button>
             ))}
+            <input
+              type="number"
+              min="1"
+              inputMode="numeric"
+              placeholder="Max"
+              value={outOf}
+              onChange={(e) => setOutOf(e.target.value)}
+              onBlur={(e) => {
+                const n = Number(e.target.value);
+                setOutOf(n > 0 ? String(n) : '100');
+              }}
+              className="marks-custom-outof-input"
+              title="Custom maximum score"
+            />
             <button
               type="button"
               className={`marks-details-toggle-btn ${showConfigDetails ? 'active' : ''}`}
               onClick={() => setShowConfigDetails(prev => !prev)}
-              title="Edit assessment topic, date or custom maximum"
+              title="Edit assessment topic and date"
             >
               {showConfigDetails ? 'Hide Options' : 'Options'}
             </button>
@@ -298,18 +312,6 @@ export default function MarksEntrySheet({
                 onChange={(e) => setTopic(e.target.value)}
                 placeholder="e.g. End Term Exam, Mid Term, Quiz 1"
                 className="details-input"
-              />
-            </div>
-
-            <div className="details-col" style={{ maxWidth: 140 }}>
-              <label className="details-label">Custom Max</label>
-              <input
-                type="number"
-                min="1"
-                value={outOf}
-                onChange={(e) => setOutOf(Number(e.target.value) || 100)}
-                className="details-input"
-                style={{ textAlign: 'center' }}
               />
             </div>
 
@@ -334,11 +336,11 @@ export default function MarksEntrySheet({
               const rawScore = scores[learner.id];
               const hasValue = rawScore !== undefined && rawScore !== null && String(rawScore).trim() !== '';
               const numScore = hasValue ? Number(rawScore) : null;
-              const percentage = numScore !== null && !isNaN(numScore) && outOf > 0
-                ? Math.round((numScore / outOf) * 100)
+              const percentage = numScore !== null && !isNaN(numScore) && Number(outOf) > 0
+                ? Math.round((numScore / Number(outOf)) * 100)
                 : null;
               const grade = percentage !== null ? resolveGrade(percentage, GRADING_SYSTEMS.CBC_LEVELS) : null;
-              const isOverMax = numScore !== null && numScore > outOf;
+              const isOverMax = numScore !== null && numScore > Number(outOf);
 
               return (
                 <div key={learner.id} className="marks-fullscreen-row">
@@ -368,7 +370,7 @@ export default function MarksEntrySheet({
                       ref={el => inputRefs.current[learner.id] = el}
                       type="number"
                       min="0"
-                      max={outOf}
+                      max={Number(outOf)}
                       step="any"
                       inputMode="decimal"
                       placeholder="—"
