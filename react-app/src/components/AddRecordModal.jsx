@@ -60,12 +60,7 @@ export default function AddRecordModal({
     }
   }, [isOpen, initialType, initialLearnerId]);
 
-  if (!isOpen) return null;
-
-  const activeType = RECORD_TYPES.find(t => t.id === recordType) || RECORD_TYPES[0];
-  const selectedLearner = learners.find(l => l.id === selectedLearnerId);
-
-  // Filtered learner list for the inline picker
+  // Filtered learner list for the inline picker — MUST be before early return
   const filteredLearners = useMemo(() => {
     const q = learnerSearch.toLowerCase().trim();
     if (!q) return learners;
@@ -74,6 +69,11 @@ export default function AddRecordModal({
            String(l.admissionNumber || '').includes(q)
     );
   }, [learners, learnerSearch]);
+
+  if (!isOpen) return null;
+
+  const activeType = RECORD_TYPES.find(t => t.id === recordType) || RECORD_TYPES[0];
+  const selectedLearner = learners.find(l => l.id === selectedLearnerId);
 
   // Live percentage preview
   const scoreNum = Number(score);
