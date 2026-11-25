@@ -22,6 +22,7 @@ export default function MarksEntrySheet({
   const [searchQuery, setSearchQuery] = useState('');
   const [scores, setScores] = useState({}); // learnerId -> numeric string or empty
   const [isSaved, setIsSaved] = useState(false);
+  const [showConfigDetails, setShowConfigDetails] = useState(false);
 
   const inputRefs = useRef({});
 
@@ -207,7 +208,7 @@ export default function MarksEntrySheet({
         </div>
 
         <div className="marks-fullscreen-right">
-          <div className="marks-fullscreen-quick-stats">
+          <div className="marks-fullscreen-quick-stats desktop-stats-only">
             <strong>{stats.enteredCount}</strong> / {stats.totalCount} Entered
             {stats.averagePct !== null && ` &bull; Mean: ${stats.averagePct}%`}
           </div>
@@ -215,7 +216,7 @@ export default function MarksEntrySheet({
             <button
               type="button"
               onClick={onClose}
-              className="btn-sheet-trigger"
+              className="marks-done-button"
             >
               Done
             </button>
@@ -240,70 +241,98 @@ export default function MarksEntrySheet({
         })}
       </nav>
 
-      {/* ── 3. Configuration & Search Bar (Edge-to-Edge) ── */}
-      <div className="marks-fullscreen-config-bar">
-        <div className="config-item config-topic">
-          <label className="config-label">Topic / Assessment</label>
-          <input
-            type="text"
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            placeholder="e.g. End Term Exam, Mid Term, Quiz 1"
-            className="config-input-text"
-          />
-        </div>
-
-        <div className="config-item config-outof">
-          <label className="config-label">Max Score (Out of)</label>
-          <div className="config-outof-chips">
+      {/* ── 3. Compact Mobile & Desktop Configuration Strip ── */}
+      <div className="marks-compact-config-bar">
+        {/* Quick Toolbar (Always visible on mobile & desktop) */}
+        <div className="marks-toolbar-row">
+          <div className="marks-search-wrapper">
             <input
-              type="number"
-              min="1"
-              value={outOf}
-              onChange={(e) => setOutOf(Number(e.target.value) || 100)}
-              className="config-input-number"
+              type="text"
+              placeholder="Search student or admission #..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="marks-search-input"
             />
-            {[100, 50, 40, 30, 20].map(val => (
+            {searchQuery && (
+              <button
+                type="button"
+                className="marks-search-clear"
+                onClick={() => setSearchQuery('')}
+              >
+                x
+              </button>
+            )}
+          </div>
+
+          <div className="marks-quick-outof-group">
+            <span className="marks-outof-prefix">Out of:</span>
+            {[100, 50, 30].map(val => (
               <button
                 key={val}
                 type="button"
-                className={`config-chip ${outOf === val ? 'active' : ''}`}
+                className={`marks-quick-chip ${outOf === val ? 'active' : ''}`}
                 onClick={() => setOutOf(val)}
               >
                 {val}
               </button>
             ))}
+            <button
+              type="button"
+              className={`marks-details-toggle-btn ${showConfigDetails ? 'active' : ''}`}
+              onClick={() => setShowConfigDetails(prev => !prev)}
+              title="Edit assessment topic, date or custom maximum"
+            >
+              {showConfigDetails ? 'Hide Options' : 'Options'}
+            </button>
           </div>
         </div>
 
-        <div className="config-item config-date">
-          <label className="config-label">Date</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="config-input-date"
-          />
-        </div>
+        {/* Collapsible Details Panel (for Topic, Date, Custom Max) */}
+        {showConfigDetails && (
+          <div className="marks-expanded-details-panel">
+            <div className="details-col">
+              <label className="details-label">Assessment Title / Topic</label>
+              <input
+                type="text"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder="e.g. End Term Exam, Mid Term, Quiz 1"
+                className="details-input"
+              />
+            </div>
 
-        <div className="config-item config-search">
-          <label className="config-label">Filter Roster</label>
-          <input
-            type="text"
-            placeholder="Search student or admission #..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="config-input-search"
-          />
-        </div>
+            <div className="details-col" style={{ maxWidth: 140 }}>
+              <label className="details-label">Custom Max</label>
+              <input
+                type="number"
+                min="1"
+                value={outOf}
+                onChange={(e) => setOutOf(Number(e.target.value) || 100)}
+                className="details-input"
+                style={{ textAlign: 'center' }}
+              />
+            </div>
+
+            <div className="details-col" style={{ maxWidth: 160 }}>
+              <label className="details-label">Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="details-input"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── 4. Fullscreen Scrollable Class Sheet Roster ── */}
       <main className="marks-fullscreen-roster-body">
+        {/* Table header row (Desktop & Tablet) */}
         <div className="marks-fullscreen-roster-header-row">
           <div className="col-student">Learner Name</div>
           <div className="col-score">Score / {outOf}</div>
-          <div className="col-level">Performance Level</div>
+          <div className="col-level desktop-grade-col">Performance Level</div>
         </div>
 
         <div className="marks-fullscreen-roster-list">
@@ -320,17 +349,27 @@ export default function MarksEntrySheet({
 
               return (
                 <div key={learner.id} className="marks-fullscreen-row">
+                  {/* Left: Student Identity + Mobile Inline Grade */}
                   <div className="row-student-info">
                     <span className="row-index">#{idx + 1}</span>
                     <div className="row-name-block">
-                      <strong className="row-fullname">{learner.fullName}</strong>
-                      <span className="row-admission-meta">
-                        {learner.admissionNumber ? `Adm #${learner.admissionNumber}` : ''}
-                        {learner.gender ? ` &bull; ${learner.gender}` : ''}
-                      </span>
+                      <div className="row-fullname">{learner.fullName}</div>
+                      <div className="row-sub-line">
+                        <span className="row-admission-meta">
+                          {learner.admissionNumber ? `Adm #${learner.admissionNumber}` : ''}
+                        </span>
+                        {isOverMax ? (
+                          <span className="mobile-grade-inline tag alert">Exceeds {outOf}</span>
+                        ) : grade && percentage !== null ? (
+                          <span className={`mobile-grade-inline grade-${grade.code.toLowerCase()}`}>
+                            {percentage}% {grade.code}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
 
+                  {/* Middle: Touch Score Input */}
                   <div className="row-score-input-block">
                     <input
                       ref={el => inputRefs.current[learner.id] = el}
@@ -348,7 +387,8 @@ export default function MarksEntrySheet({
                     <span className="fullscreen-outof-suffix">/ {outOf}</span>
                   </div>
 
-                  <div className="row-grade-block">
+                  {/* Right: Desktop Performance Level Badge */}
+                  <div className="row-grade-block desktop-grade-col">
                     {isOverMax ? (
                       <span className="tag alert" style={{ fontSize: 11 }}>Exceeds {outOf}</span>
                     ) : grade && percentage !== null ? (
@@ -374,34 +414,23 @@ export default function MarksEntrySheet({
       <footer className="marks-fullscreen-footer">
         <div className="footer-summary-left">
           <div className="footer-primary-stat">
-            <strong>{stats.enteredCount}</strong> of <strong>{stats.totalCount}</strong> marks recorded
+            <strong>{stats.enteredCount}</strong> of <strong>{stats.totalCount}</strong> marked
           </div>
           {stats.averagePct !== null && (
             <div className="footer-secondary-stat">
-              Class Average: <strong>{stats.average} / {outOf} ({stats.averagePct}%)</strong>
-              {stats.highest !== null && ` &bull; Highest: ${stats.highest}`}
-              {stats.lowest !== null && ` &bull; Lowest: ${stats.lowest}`}
+              Avg: <strong>{stats.average} / {outOf} ({stats.averagePct}%)</strong>
             </div>
           )}
         </div>
 
         <div className="footer-actions-right">
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn-sheet-trigger"
-            >
-              Close
-            </button>
-          )}
           <button
             type="button"
             onClick={handleSaveAll}
             className="btn-marks-save-large"
             disabled={stats.enteredCount === 0}
           >
-            {isSaved ? 'All Marks Saved' : `Save ${stats.enteredCount > 0 ? stats.enteredCount : ''} Marks`}
+            {isSaved ? 'Saved' : `Save ${stats.enteredCount > 0 ? stats.enteredCount : ''} Marks`}
           </button>
         </div>
       </footer>

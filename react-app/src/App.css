@@ -2740,12 +2740,14 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
   bottom: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   background: var(--bg, #f8f9fa);
   z-index: 999999;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   box-sizing: border-box;
+  overscroll-behavior: contain;
 }
 
 /* Fullscreen Top Header */
@@ -2753,23 +2755,26 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 20px;
+  padding: 12px 18px;
   background: var(--surface, #ffffff);
   border-bottom: 1.5px solid var(--border, #e5e7eb);
   flex-shrink: 0;
+  min-height: 52px;
 }
 
 .marks-fullscreen-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
 }
 
 .marks-back-button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
+  gap: 4px;
+  padding: 7px 12px;
   border-radius: 8px;
   border: 1.5px solid var(--border, #e5e7eb);
   background: var(--surface, #ffffff);
@@ -2778,6 +2783,7 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
   font-weight: 750;
   cursor: pointer;
   transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
 .marks-back-button:hover {
@@ -2788,30 +2794,38 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
 .marks-fullscreen-heading {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .marks-fullscreen-subject-name {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 850;
   color: var(--ink, #0f172a);
   letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .marks-fullscreen-subtext {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted, #64748b);
   margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .marks-fullscreen-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .marks-fullscreen-quick-stats {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted, #64748b);
 }
 
@@ -2819,11 +2833,22 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
   color: var(--ink, #0f172a);
 }
 
+.marks-done-button {
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border, #e5e7eb);
+  background: var(--surface, #ffffff);
+  color: var(--ink, #0f172a);
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
 /* Horizontal Fullscreen Subject Tabs (100% width) */
 .marks-fullscreen-subject-bar {
   display: flex;
-  gap: 8px;
-  padding: 10px 20px;
+  gap: 6px;
+  padding: 8px 14px;
   background: var(--surface, #ffffff);
   border-bottom: 1px solid var(--line, #e2e8f0);
   overflow-x: auto;
@@ -2832,21 +2857,22 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
 }
 
 .marks-fullscreen-subject-bar::-webkit-scrollbar {
-  height: 4px;
+  height: 3px;
 }
 
 .marks-fullscreen-subject-tab {
-  padding: 8px 16px;
-  border-radius: 20px;
+  padding: 6px 13px;
+  border-radius: 18px;
   border: 1px solid var(--border, #e2e8f0);
   background: var(--bg, #f8f9fa);
   color: var(--ink, #0f172a);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 750;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.15s ease;
+  transition: all 0.12s ease;
   font-family: inherit;
+  flex-shrink: 0;
 }
 
 .marks-fullscreen-subject-tab:hover {
@@ -2859,100 +2885,76 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
   border-color: var(--ink, #0f172a);
 }
 
-/* Configuration & Search Bar */
-.marks-fullscreen-config-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  padding: 12px 20px;
+/* Compact Configuration Bar (Mobile & Desktop) */
+.marks-compact-config-bar {
   background: var(--bg, #f8f9fa);
   border-bottom: 1.5px solid var(--border, #e5e7eb);
-  align-items: flex-end;
+  padding: 8px 14px;
   flex-shrink: 0;
 }
 
-.config-item {
+.marks-toolbar-row {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.config-topic {
-  flex: 1.5;
-  min-width: 180px;
+.marks-search-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 0;
 }
 
-.config-outof {
-  min-width: 220px;
-}
-
-.config-date {
-  min-width: 140px;
-}
-
-.config-search {
-  flex: 1.5;
-  min-width: 200px;
-}
-
-.config-label {
-  font-size: 11px;
-  font-weight: 750;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted, #64748b);
-}
-
-.config-input-text,
-.config-input-date,
-.config-input-search {
-  padding: 8px 12px;
+.marks-search-input {
+  width: 100%;
+  padding: 8px 28px 8px 12px;
   border-radius: 8px;
-  border: 1.5px solid var(--border, #e2e8f0);
+  border: 1.5px solid var(--border, #cbd5e1);
   background: #ffffff;
   color: var(--ink, #0f172a);
   font-size: 13px;
   font-family: inherit;
   outline: none;
-  width: 100%;
   box-sizing: border-box;
 }
 
-.config-input-text:focus,
-.config-input-date:focus,
-.config-input-search:focus {
+.marks-search-input:focus {
   border-color: var(--ink, #0f172a);
 }
 
-.config-outof-chips {
+.marks-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--muted, #64748b);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 4px;
+}
+
+.marks-quick-outof-group {
   display: flex;
-  gap: 6px;
   align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
 }
 
-.config-input-number {
-  width: 65px;
-  padding: 8px 8px;
-  text-align: center;
-  font-size: 14px;
-  font-weight: 800;
-  border-radius: 8px;
-  border: 1.5px solid var(--border, #e2e8f0);
-  background: #ffffff;
-  color: var(--ink, #0f172a);
-  outline: none;
-  font-family: inherit;
-  box-sizing: border-box;
+.marks-outof-prefix {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted, #64748b);
+  white-space: nowrap;
 }
 
-.config-input-number:focus {
-  border-color: var(--ink, #0f172a);
-}
-
-.config-chip {
-  padding: 6px 10px;
+.marks-quick-chip {
+  padding: 6px 9px;
   border-radius: 6px;
-  border: 1px solid var(--border, #e2e8f0);
+  border: 1px solid var(--border, #cbd5e1);
   background: #ffffff;
   color: var(--ink, #0f172a);
   font-size: 12px;
@@ -2961,9 +2963,70 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
   transition: all 0.12s ease;
 }
 
-.config-chip.active {
+.marks-quick-chip.active {
   background: var(--ink, #0f172a);
   color: #ffffff;
+  border-color: var(--ink, #0f172a);
+}
+
+.marks-details-toggle-btn {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px dashed var(--border, #94a3b8);
+  background: var(--surface, #ffffff);
+  color: var(--ink, #0f172a);
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.marks-details-toggle-btn.active {
+  background: var(--soft, #f1f5f9);
+  border-color: var(--ink, #0f172a);
+}
+
+/* Collapsible Details Panel */
+.marks-expanded-details-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line, #e2e8f0);
+  margin-top: 8px;
+  align-items: flex-end;
+}
+
+.details-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 130px;
+}
+
+.details-label {
+  font-size: 10px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted, #64748b);
+}
+
+.details-input {
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border, #cbd5e1);
+  background: #ffffff;
+  color: var(--ink, #0f172a);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.details-input:focus {
   border-color: var(--ink, #0f172a);
 }
 
@@ -2974,13 +3037,14 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
   display: flex;
   flex-direction: column;
   background: var(--surface, #ffffff);
+  -webkit-overflow-scrolling: touch;
 }
 
 .marks-fullscreen-roster-header-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 20px;
+  padding: 8px 18px;
   background: var(--bg, #f8f9fa);
   border-bottom: 1.5px solid var(--border, #e5e7eb);
   font-size: 11px;
@@ -2998,12 +3062,12 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
 }
 
 .marks-fullscreen-roster-header-row .col-score {
-  width: 130px;
+  width: 110px;
   text-align: center;
 }
 
 .marks-fullscreen-roster-header-row .col-level {
-  width: 140px;
+  width: 130px;
   text-align: right;
 }
 
@@ -3016,9 +3080,10 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px;
+  padding: 10px 18px;
   border-bottom: 1px solid var(--line, #f1f5f9);
   transition: background 0.1s ease;
+  gap: 10px;
 }
 
 .marks-fullscreen-row:hover {
@@ -3028,50 +3093,73 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
 .row-student-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex: 1;
   min-width: 0;
 }
 
 .row-index {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 750;
   color: var(--muted, #94a3b8);
-  min-width: 28px;
+  min-width: 22px;
+  flex-shrink: 0;
 }
 
 .row-name-block {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  gap: 2px;
 }
 
 .row-fullname {
-  font-size: 15px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 750;
   color: var(--ink, #0f172a);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.row-admission-meta {
-  font-size: 12px;
+.row-sub-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
   color: var(--muted, #64748b);
-  margin-top: 1px;
+  flex-wrap: wrap;
+}
+
+.row-admission-meta {
+  font-size: 11px;
+  color: var(--muted, #64748b);
+  white-space: nowrap;
+}
+
+/* Mobile inline grade badge (visible under student name) */
+.mobile-grade-inline {
+  display: none;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
 .row-score-input-block {
   display: flex;
   align-items: center;
-  gap: 6px;
-  width: 130px;
-  justify-content: center;
+  gap: 4px;
+  flex-shrink: 0;
+  justify-content: flex-end;
 }
 
 .fullscreen-score-input {
-  width: 72px;
-  padding: 10px 8px;
+  width: 64px;
+  height: 42px;
+  padding: 6px 4px;
   text-align: center;
   font-size: 18px;
   font-weight: 850;
@@ -3103,16 +3191,17 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
 }
 
 .fullscreen-outof-suffix {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--muted, #64748b);
   white-space: nowrap;
 }
 
 .row-grade-block {
-  width: 140px;
+  width: 130px;
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .marks-grade-chip {
@@ -3153,49 +3242,55 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 14px;
-  padding: 14px 20px;
+  padding: 10px 18px;
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
   background: var(--surface, #ffffff);
   border-top: 1.5px solid var(--border, #e5e7eb);
   flex-shrink: 0;
   z-index: 10;
+  min-height: 54px;
+  box-sizing: border-box;
 }
 
 .footer-summary-left {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .footer-primary-stat {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 750;
   color: var(--ink, #0f172a);
+  white-space: nowrap;
 }
 
 .footer-secondary-stat {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted, #64748b);
-  margin-top: 2px;
+  margin-top: 1px;
+  white-space: nowrap;
 }
 
 .footer-actions-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .btn-marks-save-large {
-  padding: 12px 24px;
-  border-radius: 10px;
+  padding: 10px 20px;
+  border-radius: 8px;
   border: none;
   background: var(--ink, #0f172a);
   color: #ffffff;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
   cursor: pointer;
   transition: all 0.15s ease;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
 }
 
 .btn-marks-save-large:disabled {
@@ -3207,4 +3302,111 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
 .btn-marks-save-large:not(:disabled):hover {
   opacity: 0.92;
   transform: translateY(-1px);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   5. Mobile Responsiveness for Marks Entry Sheet (<= 768px)
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .desktop-stats-only {
+    display: none !important;
+  }
+
+  .desktop-grade-col {
+    display: none !important;
+  }
+
+  .mobile-grade-inline {
+    display: inline-flex !important;
+  }
+
+  .marks-fullscreen-header {
+    padding: 8px 12px;
+    min-height: 48px;
+  }
+
+  .marks-fullscreen-subject-name {
+    font-size: 16px;
+  }
+
+  .marks-fullscreen-subtext {
+    font-size: 10px;
+  }
+
+  .marks-back-button {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .marks-done-button {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .marks-fullscreen-subject-bar {
+    padding: 6px 12px;
+    gap: 5px;
+  }
+
+  .marks-fullscreen-subject-tab {
+    padding: 5px 11px;
+    font-size: 11px;
+  }
+
+  .marks-compact-config-bar {
+    padding: 8px 12px;
+  }
+
+  .marks-toolbar-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .marks-quick-outof-group {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .marks-fullscreen-roster-header-row {
+    padding: 6px 12px;
+  }
+
+  .marks-fullscreen-roster-header-row .col-score {
+    width: 90px;
+    text-align: right;
+  }
+
+  .marks-fullscreen-row {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .row-fullname {
+    font-size: 13.5px;
+  }
+
+  .fullscreen-score-input {
+    width: 58px;
+    height: 40px;
+    font-size: 17px;
+  }
+
+  .marks-fullscreen-footer {
+    padding: 8px 12px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+
+  .footer-primary-stat {
+    font-size: 12px;
+  }
+
+  .footer-secondary-stat {
+    font-size: 10px;
+  }
+
+  .btn-marks-save-large {
+    padding: 9px 16px;
+    font-size: 12.5px;
+  }
 }
