@@ -1,6 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createEvent } from '../core/database/schema.js';
+import { CANONICAL_SUBJECTS } from '../features/academic-records/models/subjects.js';
 import { XIcon } from '../Icons.jsx';
+
+// ─── Record type definitions ────────────────────────────────────────────────
+const RECORD_TYPES = [
+  { id: 'observation',        label: 'Observation',   hint: 'What did you notice?',          needsSubject: true,  needsScore: false },
+  { id: 'commendation',       label: 'Commendation',  hint: 'What did they do well?',        needsSubject: false, needsScore: false },
+  { id: 'learning_difficulty',label: 'Difficulty',    hint: 'What is the learner struggling with?', needsSubject: true, needsScore: false },
+  { id: 'behaviour',          label: 'Discipline',    hint: 'Describe the incident.',        needsSubject: false, needsScore: false },
+  { id: 'assessment',         label: 'Assessment',    hint: 'Score for this assessment.',    needsSubject: true,  needsScore: true  },
+];
+
+function todayISO() {
+  return new Date().toISOString().split('T')[0];
+}
 
 export default function AddRecordModal({
   isOpen,
@@ -11,50 +25,89 @@ export default function AddRecordModal({
   activeClass,
   onCommitEvent,
   onToast,
-  initialType = 'observation', // 'assessment' | 'observation' | 'learning_difficulty' | 'behaviour' | 'commendation'
+  initialType = 'observation',
+  initialLearnerId = '',
 }) {
-  const [recordType, setRecordType] = useState(initialType);
-  const [selectedLearnerId, setSelectedLearnerId] = useState('');
-  const [subject, setSubject] = useState('Mathematics');
-  const [score, setScore] = useState('80');
-  const [outOf, setOutOf] = useState('100');
-  const [topic, setTopic] = useState('');
-  const [mistakeTag, setMistakeTag] = useState('');
-  const [details, setDetails] = useState('');
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [recordType, setRecordType]           = useState(initialType);
+  const [learnerSearch, setLearnerSearch]     = useState('');
+  const [selectedLearnerId, setSelectedLearnerId] = useState(initialLearnerId);
+  const [showLearnerPicker, setShowLearnerPicker] = useState(false);
+  const [subject, setSubject]                 = useState(CANONICAL_SUBJECTS[0].code);
+  const [score, setScore]                     = useState('');
+  const [outOf, setOutOf]                     = useState('100');
+  const [topic, setTopic]                     = useState('');
+  const [details, setDetails]                 = useState('');
+  const [date, setDate]                       = useState(todayISO);
+  const [saved, setSaved]                     = useState(false);
+
+  const detailsRef = useRef(null);
+  const searchRef  = useRef(null);
+
+  // Reset form when re-opened
+  useEffect(() => {
+    if (isOpen) {
+      setRecordType(initialType);
+      setSelectedLearnerId(initialLearnerId);
+      setLearnerSearch('');
+      setShowLearnerPicker(false);
+      setSubject(CANONICAL_SUBJECTS[0].code);
+      setScore('');
+      setOutOf('100');
+      setTopic('');
+      setDetails('');
+      setDate(todayISO());
+      setSaved(false);
+    }
+  }, [isOpen, initialType, initialLearnerId]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const activeType = RECORD_TYPES.find(t => t.id === recordType) || RECORD_TYPES[0];
+  const selectedLearner = learners.find(l => l.id === selectedLearnerId);
+
+  // Filtered learner list for the inline picker
+  const filteredLearners = useMemo(() => {
+    const q = learnerSearch.toLowerCase().trim();
+    if (!q) return learners;
+    return learners.filter(
+      l => (l.fullName || '').toLowerCase().includes(q) ||
+           String(l.admissionNumber || '').includes(q)
+    );
+  }, [learners, learnerSearch]);
+
+  // Live percentage preview
+  const scoreNum = Number(score);
+  const outOfNum = Number(outOf) || 100;
+  const pct = score !== '' && !isNaN(scoreNum) && outOfNum > 0
+    ? Math.round((scoreNum / outOfNum) * 100)
+    : null;
+
+  const saveRecord = () => {
     if (!selectedLearnerId) {
-      if (onToast) onToast('Please select a learner.');
-      return;
+      if (onToast) onToast('Select a learner first.');
+      return false;
+    }
+    if (activeType.needsScore && score === '') {
+      if (onToast) onToast('Enter a score.');
+      return false;
+    }
+    if (!activeType.needsScore && !details.trim()) {
+      if (onToast) onToast('Write a note first.');
+      return false;
     }
 
     const learner = learners.find(l => l.id === selectedLearnerId);
-
     let eventType = 'note';
     let action = 'observation';
 
-    if (recordType === 'assessment') {
-      eventType = 'assessment';
-      action = 'score';
-    } else if (recordType === 'learning_difficulty') {
-      eventType = 'classwork';
-      action = 'learning_difficulty';
-    } else if (recordType === 'behaviour') {
-      eventType = 'incident';
-      action = 'discipline';
-    } else if (recordType === 'commendation') {
-      eventType = 'incident';
-      action = 'commendation';
-    }
+    if (recordType === 'assessment') { eventType = 'assessment'; action = 'score'; }
+    else if (recordType === 'learning_difficulty') { eventType = 'classwork'; action = 'learning_difficulty'; }
+    else if (recordType === 'behaviour') { eventType = 'incident'; action = 'discipline'; }
+    else if (recordType === 'commendation') { eventType = 'incident'; action = 'commendation'; }
 
-    const numScore = Number(score);
-    const numOutOf = Number(outOf) || 100;
+    const activeSubject = CANONICAL_SUBJECTS.find(s => s.code === subject);
 
-    const newEv = createEvent({
+    const ev = createEvent({
       schoolId: activeSchool?.id || learner?.schoolId || currentUser?.schoolId || '11111111-1111-1111-1111-111111111111',
       type: eventType,
       action,
@@ -63,332 +116,250 @@ export default function AddRecordModal({
       classId:   learner?.classId   || activeClass?.classId   || currentUser?.classId   || null,
       date,
       value: {
-        score: recordType === 'assessment' ? numScore : null,
-        outOf: recordType === 'assessment' ? numOutOf : null,
-        percentage: recordType === 'assessment' ? Math.round((numScore / numOutOf) * 100) : null,
-        subject: recordType !== 'behaviour' && recordType !== 'commendation' ? subject : null,
-        topic: topic.trim() || null,
-        mistakeTag: mistakeTag.trim() || null,
-        details: details.trim(),
+        score:      recordType === 'assessment' ? scoreNum : null,
+        outOf:      recordType === 'assessment' ? outOfNum : null,
+        percentage: recordType === 'assessment' ? pct : null,
+        subject:    activeType.needsSubject ? (activeSubject?.name || subject) : null,
+        subjectCode: activeType.needsSubject ? subject : null,
+        topic:      topic.trim() || null,
+        details:    details.trim() || null,
       },
       source: recordType === 'assessment'
-        ? `Assessment • ${subject}`
+        ? `Assessment • ${activeSubject?.name || subject}`
         : `Teacher Record • ${learner?.fullName}`,
       createdByUserId: currentUser?.userId,
       createdByName:   currentUser?.name,
       createdByRole:   currentUser?.role,
     });
 
-    onCommitEvent(newEv);
-    if (onToast) onToast(`Recorded for ${learner?.fullName}`);
-    onClose();
+    onCommitEvent(ev);
+    if (onToast) onToast(`Saved for ${learner?.fullName}`);
+    return true;
+  };
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    if (saveRecord()) {
+      setSaved(true);
+      onClose();
+    }
+  };
+
+  const handleSaveAndAnother = () => {
+    if (!saveRecord()) return;
+    // Keep same type & same learner, clear note fields
+    setScore('');
+    setTopic('');
+    setDetails('');
+    setSaved(false);
+    // Focus the details input
+    setTimeout(() => detailsRef.current?.focus(), 80);
+  };
+
+  const handleLearnerSelect = (l) => {
+    setSelectedLearnerId(l.id);
+    setLearnerSearch('');
+    setShowLearnerPicker(false);
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div
-        className="modal modal-sheet modal-form-sheet"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mobile-sheet-handle modal-handle-bar" />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Add Class Record
-            </div>
-            <h3 style={{ margin: '2px 0 0', fontSize: 18, color: 'var(--ink)' }}>
-              {currentUser?.className || 'Class Record'}
-            </h3>
+    <div className="arm-backdrop" onClick={onClose}>
+      <div className="arm-sheet" onClick={e => e.stopPropagation()}>
+
+        {/* ── Handle bar ── */}
+        <div className="arm-handle" />
+
+        {/* ── Header ── */}
+        <div className="arm-header">
+          <div className="arm-header-left">
+            <div className="arm-header-label">Add Record</div>
+            <div className="arm-header-class">{currentUser?.className || activeClass?.name || 'Class'}</div>
           </div>
-          <button
-            onClick={onClose}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}
-          >
+          <button type="button" className="arm-close-btn" onClick={onClose} aria-label="Close">
             <XIcon size={18} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* Record Type Selector */}
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>
-              Record Type
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 6 }}>
-              {[
-                { id: 'assessment', label: 'Assessment' },
-                { id: 'observation', label: 'Observation' },
-                { id: 'learning_difficulty', label: 'Mistake Tag' },
-                { id: 'behaviour', label: 'Discipline' },
-                { id: 'commendation', label: 'Commendation' },
-              ].map(t => (
-                <button
-                  type="button"
-                  key={t.id}
-                  onClick={() => setRecordType(t.id)}
-                  style={{
-                    padding: '8px 8px',
-                    borderRadius: 8,
-                    border: recordType === t.id ? '1.5px solid var(--ink)' : '1px solid var(--border)',
-                    background: recordType === t.id ? 'var(--ink)' : 'var(--surface)',
-                    color: recordType === t.id ? '#fff' : 'var(--ink)',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+        <form onSubmit={handleSave} className="arm-form">
+
+          {/* ── 1. Record type pills ── */}
+          <div className="arm-type-row">
+            {RECORD_TYPES.map(t => (
+              <button
+                type="button"
+                key={t.id}
+                className={`arm-type-pill ${recordType === t.id ? 'active' : ''}`}
+                onClick={() => setRecordType(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
 
-          {/* Learner Picker */}
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
-              Learner *
-            </label>
-            <select
-              value={selectedLearnerId}
-              onChange={(e) => setSelectedLearnerId(e.target.value)}
-              required
-              style={{
-                width: '100%',
-                padding: '9px 12px',
-                borderRadius: 8,
-                border: '1.5px solid var(--border)',
-                background: 'var(--surface)',
-                color: 'var(--ink)',
-                fontSize: 13,
-                fontFamily: 'inherit',
-              }}
-            >
-              <option value="">Select a learner…</option>
-              {learners.map(l => (
-                <option key={l.id} value={l.id}>
-                  {l.fullName} {l.admissionNumber ? `(#${l.admissionNumber})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Assessment Fields: Subject & Score */}
-          {recordType === 'assessment' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: 8 }}>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
-                  Subject
-                </label>
-                <select
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    borderRadius: 8,
-                    border: '1.5px solid var(--border)',
-                    background: 'var(--surface)',
-                    color: 'var(--ink)',
-                    fontSize: 13,
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  <option value="Mathematics">Mathematics</option>
-                  <option value="English">English</option>
-                  <option value="Kiswahili">Kiswahili</option>
-                  <option value="Science">Science / Env</option>
-                  <option value="CRE">CRE</option>
-                  <option value="General">General</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
-                  Score
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="1000"
-                  value={score}
-                  onChange={(e) => setScore(e.target.value)}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    borderRadius: 8,
-                    border: '1.5px solid var(--border)',
-                    background: 'var(--surface)',
-                    color: 'var(--ink)',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    fontFamily: 'inherit',
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
-                  Out Of
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="1000"
-                  value={outOf}
-                  onChange={(e) => setOutOf(e.target.value)}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    borderRadius: 8,
-                    border: '1.5px solid var(--border)',
-                    background: 'var(--surface)',
-                    color: 'var(--ink)',
-                    fontSize: 13,
-                    fontFamily: 'inherit',
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Subject & Topic (for observation & learning difficulty) */}
-          {(recordType === 'observation' || recordType === 'learning_difficulty') && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
-                  Subject
-                </label>
-                <select
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    borderRadius: 8,
-                    border: '1.5px solid var(--border)',
-                    background: 'var(--surface)',
-                    color: 'var(--ink)',
-                    fontSize: 13,
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  <option value="Mathematics">Mathematics</option>
-                  <option value="English">English</option>
-                  <option value="Kiswahili">Kiswahili</option>
-                  <option value="Science">Science / Env</option>
-                  <option value="CRE">CRE</option>
-                  <option value="General">General</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
-                  Topic / Skill
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Place Value"
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    borderRadius: 8,
-                    border: '1.5px solid var(--border)',
-                    background: 'var(--surface)',
-                    color: 'var(--ink)',
-                    fontSize: 13,
-                    fontFamily: 'inherit',
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Details / Notes */}
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
-              What did you observe?
-            </label>
-            <textarea
-              rows={3}
-              required
-              placeholder="Describe what occurred or what the learner is struggling with..."
-              value={details}
-              onChange={(e) => setDetails(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '9px 12px',
-                borderRadius: 8,
-                border: '1.5px solid var(--border)',
-                background: 'var(--surface)',
-                color: 'var(--ink)',
-                fontSize: 13,
-                fontFamily: 'inherit',
-                resize: 'vertical',
-              }}
-            />
-          </div>
-
-          {/* Date */}
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
-              Date
-            </label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                borderRadius: 8,
-                border: '1.5px solid var(--border)',
-                background: 'var(--surface)',
-                color: 'var(--ink)',
-                fontSize: 13,
-                fontFamily: 'inherit',
-              }}
-            />
-          </div>
-
-          {/* Submit */}
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          {/* ── 2. Learner picker ── */}
+          <div className="arm-field">
+            <label className="arm-label">Learner</label>
             <button
               type="button"
-              onClick={onClose}
-              style={{
-                flex: 1,
-                padding: '10px 0',
-                borderRadius: 8,
-                border: '1.5px solid var(--border)',
-                background: 'transparent',
-                color: 'var(--muted)',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
+              className={`arm-learner-btn ${!selectedLearner ? 'placeholder' : ''}`}
+              onClick={() => { setShowLearnerPicker(v => !v); setTimeout(() => searchRef.current?.focus(), 60); }}
             >
-              Cancel
+              {selectedLearner
+                ? <><span className="arm-learner-name">{selectedLearner.fullName}</span>
+                    {selectedLearner.admissionNumber && <span className="arm-learner-adm">#{selectedLearner.admissionNumber}</span>}</>
+                : 'Tap to select a learner'}
+              <span className="arm-learner-caret">{showLearnerPicker ? '▲' : '▼'}</span>
             </button>
-            <button
-              type="submit"
-              style={{
-                flex: 2,
-                padding: '10px 0',
-                borderRadius: 8,
-                background: 'var(--ink)',
-                color: '#fff',
-                fontWeight: 700,
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
+
+            {showLearnerPicker && (
+              <div className="arm-learner-picker">
+                <input
+                  ref={searchRef}
+                  type="text"
+                  className="arm-learner-search"
+                  placeholder="Search by name or admission #"
+                  value={learnerSearch}
+                  onChange={e => setLearnerSearch(e.target.value)}
+                />
+                <div className="arm-learner-list">
+                  {filteredLearners.length === 0 && (
+                    <div className="arm-learner-empty">No learners found</div>
+                  )}
+                  {filteredLearners.map((l, i) => (
+                    <button
+                      type="button"
+                      key={l.id}
+                      className={`arm-learner-option ${l.id === selectedLearnerId ? 'selected' : ''}`}
+                      onClick={() => handleLearnerSelect(l)}
+                    >
+                      <span className="arm-lo-index">{i + 1}</span>
+                      <span className="arm-lo-name">{l.fullName}</span>
+                      {l.admissionNumber && <span className="arm-lo-adm">#{l.admissionNumber}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── 3. Subject + Topic (when applicable) ── */}
+          {activeType.needsSubject && (
+            <div className="arm-row-2">
+              <div className="arm-field arm-field-grow">
+                <label className="arm-label">Subject</label>
+                <select
+                  className="arm-select"
+                  value={subject}
+                  onChange={e => setSubject(e.target.value)}
+                >
+                  {CANONICAL_SUBJECTS.map(s => (
+                    <option key={s.code} value={s.code}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="arm-field arm-field-grow">
+                <label className="arm-label">Topic / Skill</label>
+                <input
+                  type="text"
+                  className="arm-input"
+                  placeholder="e.g. Place Value"
+                  value={topic}
+                  onChange={e => setTopic(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ── 4. Score entry (assessment only) ── */}
+          {activeType.needsScore && (
+            <div className="arm-field">
+              <label className="arm-label">Score</label>
+              <div className="arm-score-row">
+                <input
+                  type="number"
+                  className="arm-score-input"
+                  inputMode="numeric"
+                  min="0"
+                  placeholder="—"
+                  value={score}
+                  onChange={e => setScore(e.target.value)}
+                  autoFocus
+                />
+                <span className="arm-score-sep">/</span>
+                <input
+                  type="number"
+                  className="arm-outof-input"
+                  inputMode="numeric"
+                  min="1"
+                  placeholder="100"
+                  value={outOf}
+                  onChange={e => setOutOf(e.target.value)}
+                  onBlur={e => { const n = Number(e.target.value); setOutOf(n > 0 ? String(n) : '100'); }}
+                />
+                {pct !== null && (
+                  <span className={`arm-pct-badge ${pct >= 80 ? 'ee' : pct >= 65 ? 'me' : pct >= 50 ? 'ae' : 'be'}`}>
+                    {pct}%
+                  </span>
+                )}
+              </div>
+              <div className="arm-score-chips">
+                {[100, 50, 30, 20].map(v => (
+                  <button
+                    type="button"
+                    key={v}
+                    className={`arm-score-chip ${Number(outOf) === v ? 'active' : ''}`}
+                    onClick={() => setOutOf(String(v))}
+                  >
+                    /{v}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── 5. Main note / detail field ── */}
+          {!activeType.needsScore && (
+            <div className="arm-field">
+              <label className="arm-label">{activeType.hint}</label>
+              <textarea
+                ref={detailsRef}
+                className="arm-textarea"
+                rows={3}
+                placeholder="Write a brief note…"
+                value={details}
+                onChange={e => setDetails(e.target.value)}
+              />
+            </div>
+          )}
+
+          {/* ── 6. Date (collapsed by default to today) ── */}
+          <div className="arm-date-row">
+            <span className="arm-date-label">Date:</span>
+            <input
+              type="date"
+              className="arm-date-input"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+            />
+          </div>
+
+          {/* ── 7. Actions ── */}
+          <div className="arm-actions">
+            <button type="button" className="arm-btn-cancel" onClick={onClose}>Cancel</button>
+            {!activeType.needsScore && (
+              <button
+                type="button"
+                className="arm-btn-another"
+                onClick={handleSaveAndAnother}
+              >
+                Save + Add
+              </button>
+            )}
+            <button type="submit" className="arm-btn-save">
               Save Record
             </button>
           </div>
+
         </form>
       </div>
     </div>
