@@ -328,13 +328,6 @@ export default function MarksEntrySheet({
 
       {/* ── 4. Fullscreen Scrollable Class Sheet Roster ── */}
       <main className="marks-fullscreen-roster-body">
-        {/* Table header row (Desktop & Tablet) */}
-        <div className="marks-fullscreen-roster-header-row">
-          <div className="col-student">Learner Name</div>
-          <div className="col-score">Score / {outOf}</div>
-          <div className="col-level desktop-grade-col">Performance Level</div>
-        </div>
-
         <div className="marks-fullscreen-roster-list">
           {filteredLearners.length > 0 ? (
             filteredLearners.map((learner, idx) => {

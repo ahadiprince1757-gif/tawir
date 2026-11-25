@@ -3040,37 +3040,6 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
   -webkit-overflow-scrolling: touch;
 }
 
-.marks-fullscreen-roster-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 18px;
-  background: var(--bg, #f8f9fa);
-  border-bottom: 1.5px solid var(--border, #e5e7eb);
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted, #64748b);
-  position: sticky;
-  top: 0;
-  z-index: 5;
-}
-
-.marks-fullscreen-roster-header-row .col-student {
-  flex: 1;
-}
-
-.marks-fullscreen-roster-header-row .col-score {
-  width: 110px;
-  text-align: center;
-}
-
-.marks-fullscreen-roster-header-row .col-level {
-  width: 130px;
-  text-align: right;
-}
-
 .marks-fullscreen-roster-list {
   display: flex;
   flex-direction: column;
@@ -3366,15 +3335,6 @@ textarea:focus { border-color: #9ba49e; box-shadow: 0 0 0 3px rgba(29, 43, 36, 0
   .marks-quick-outof-group {
     justify-content: space-between;
     width: 100%;
-  }
-
-  .marks-fullscreen-roster-header-row {
-    padding: 6px 12px;
-  }
-
-  .marks-fullscreen-roster-header-row .col-score {
-    width: 90px;
-    text-align: right;
   }
 
   .marks-fullscreen-row {
